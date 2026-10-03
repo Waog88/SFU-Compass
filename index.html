@@ -100,7 +100,7 @@
       </div>
 
       <!-- Canvas Container -->
-      <div class="relative w-full aspect-[4/3] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex items-center justify-center shadow-inner">
+      <div class="relative w-full h-[550px] lg:h-[650px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex items-center justify-center shadow-inner">
         <canvas id="map-canvas" class="w-full h-full object-contain"></canvas>
       </div>
 
@@ -179,10 +179,10 @@
       "TASC2": { x: 645, y: 355 }
     };
 
-    // Load SFU Map Image
+    // Load SFU Map Image using relative repository path
     const mapImage = new Image();
-    // Base64 / Remote URL fallback for SFU Burnaby map image
-    mapImage.src = "https://raw.githubusercontent.com/Waog88/SFU-Compass/main/sfu_map.jpg";
+    mapImage.crossOrigin = "anonymous";
+    mapImage.src = "./sfu_map.jpg";
 
     const canvas = document.getElementById("map-canvas");
     const ctx = canvas.getContext("2d");
@@ -307,8 +307,8 @@
     }
 
     function setupCanvasSize() {
-      canvas.width = 1000;
-      canvas.height = 700;
+      canvas.width = 1200;
+      canvas.height = 840;
       drawMap();
     }
 
