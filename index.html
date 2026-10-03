@@ -30,8 +30,8 @@
       
       <div class="flex items-center gap-3">
         <button id="connect-btn" class="bg-red-600 hover:bg-red-500 text-white font-semibold text-xs px-4 py-2.5 rounded-lg transition-all flex items-center gap-2 shadow-md">
-          <span class="w-2 h-2 rounded-full bg-red-200 animate-ping"></span>
-          Connect Arduino Serial
+          <span id="serial-dot" class="w-2 h-2 rounded-full bg-red-200 animate-ping"></span>
+          <span id="serial-btn-text">Connect Arduino Serial</span>
         </button>
       </div>
     </div>
@@ -71,8 +71,9 @@
 
       <!-- Turn-by-Turn Step Guidance -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col">
-        <h2 class="text-sm uppercase tracking-wider font-semibold text-slate-400 mb-3">
-          Step-by-Step Directions
+        <h2 class="text-sm uppercase tracking-wider font-semibold text-slate-400 mb-3 flex items-center justify-between">
+          <span>Step-by-Step Directions</span>
+          <span id="active-step-indicator" class="text-[10px] text-red-400 font-mono">STEP 0/0</span>
         </h2>
         <div id="steps-container" class="space-y-3 overflow-y-auto max-h-[350px] pr-1 flex-1">
           <p class="text-sm text-slate-500 italic py-4 text-center">Select a start and destination to display instructions.</p>
@@ -86,7 +87,7 @@
           <span id="serial-status" class="text-[10px] text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">DISCONNECTED</span>
         </div>
         <div id="serial-log" class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 h-28 overflow-y-auto font-mono text-[11px] text-emerald-400 space-y-1">
-          <div class="text-slate-600">// Waiting for serial data packet...</div>
+          <div class="text-slate-600">// Waiting for Arduino serial hardware data...</div>
         </div>
       </div>
 
@@ -119,7 +120,7 @@
   </main>
 
   <script>
-    // Config and Landmark mappings matching Python config.py
+    // Configuration matching config.py & control_panel.ino
     const LANDMARKS = [
       "WMC", "Library", "SUB", "MBC", "AQ", 
       "Shrum Chemistry", "Shrum Physics", "Shrum Biology", 
@@ -141,7 +142,7 @@
       "TASC2": "TASC 2"
     };
 
-    // Graph definition matching Python graph.py
+    // Campus Graph from graph.py
     const GRAPH = {
       "WMC": { "WMC_EAST": 25 },
       "WMC_EAST": { "WMC": 25, "LIBRARY_WEST": 120 },
@@ -167,7 +168,7 @@
       "TASC2": { "TASC_JUNCTION": 55, "TASC1": 50 }
     };
 
-    // 2D Canvas positions for all nodes
+    // 2D Map positions
     const NODE_POSITIONS = {
       "WMC": { x: 100, y: 100 },
       "WMC_EAST": { x: 200, y: 100 },
@@ -193,7 +194,7 @@
       "TASC2": { x: 880, y: 660 }
     };
 
-    // Dijkstra's algorithm matching dijkstra.py
+    // Shortest path algorithm matching dijkstra.py
     function dijkstra(start, destination) {
       const distances = {};
       const previous = {};
@@ -244,7 +245,7 @@
       return { path, distance: distances[destination] };
     }
 
-    // Step builder matching route_builder.py
+    // Convert node path to steps matching route_builder.py
     function buildSteps(fullPath) {
       if (!fullPath || fullPath.length === 0) return [];
       const steps = [];
@@ -277,7 +278,7 @@
       return steps;
     }
 
-    // UI & Canvas Elements
+    // UI Handles
     const canvas = document.getElementById("map-canvas");
     const ctx = canvas.getContext("2d");
     const startSelect = document.getElementById("start-select");
@@ -286,8 +287,16 @@
     const distBadge = document.getElementById("route-distance-badge");
     const pathSummary = document.getElementById("path-summary");
     const serialLog = document.getElementById("serial-log");
+    const activeStepIndicator = document.getElementById("active-step-indicator");
 
     let currentRoutePath = [];
+    let currentSteps = [];
+    let activeStepSegment = 0;
+
+    // Web Serial Globals
+    let port = null;
+    let writer = null;
+    let reader = null;
 
     function initSelects() {
       LANDMARKS.forEach(landmark => {
@@ -315,7 +324,7 @@
     function drawMap() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw standard edges
+      // Draw map edges
       ctx.lineWidth = 3;
       ctx.strokeStyle = "#334155";
       for (const node in GRAPH) {
@@ -331,7 +340,7 @@
         }
       }
 
-      // Draw calculated path highlighted line
+      // Draw active route path
       if (currentRoutePath.length > 1) {
         ctx.lineWidth = 7;
         ctx.strokeStyle = "#ef4444";
@@ -373,7 +382,7 @@
       }
     }
 
-    function calculateAndDisplay() {
+    function calculateAndDisplay(fromSerial = false) {
       const start = startSelect.value;
       const dest = destSelect.value;
 
@@ -386,32 +395,46 @@
 
       const { path, distance } = dijkstra(start, dest);
       currentRoutePath = path;
+      currentSteps = buildSteps(path);
+      activeStepSegment = 0;
 
       distBadge.textContent = `${distance}m`;
       distBadge.classList.remove("hidden");
 
-      const steps = buildSteps(path);
-      stepsContainer.innerHTML = "";
+      renderStepList();
 
-      steps.forEach((step, idx) => {
+      pathSummary.textContent = `Route: ${path.join(" → ")}`;
+      logSerial(`Route computed: ${start} -> ${dest} (${distance}m)`);
+      drawMap();
+
+      // If serial is connected, send instructions back to control_panel.ino
+      sendRouteToArduino(currentSteps, distance);
+    }
+
+    function renderStepList() {
+      stepsContainer.innerHTML = "";
+      activeStepIndicator.textContent = `STEP ${activeStepSegment + 1}/${currentSteps.length}`;
+
+      currentSteps.forEach((step, idx) => {
+        const isActive = idx === activeStepSegment;
         const item = document.createElement("div");
-        item.className = "bg-slate-950 border border-slate-800 p-3 rounded-xl flex items-center justify-between";
+        item.className = `p-3 rounded-xl flex items-center justify-between border transition-all ${
+          isActive 
+            ? "bg-red-950/60 border-red-500 shadow-md scale-[1.02]" 
+            : "bg-slate-950 border-slate-800 opacity-80"
+        }`;
         item.innerHTML = `
           <div class="flex items-center gap-3">
-            <span class="w-6 h-6 rounded-full bg-red-950 text-red-400 font-bold text-xs flex items-center justify-center border border-red-800">${idx + 1}</span>
+            <span class="w-6 h-6 rounded-full ${isActive ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-400'} font-bold text-xs flex items-center justify-center border border-slate-700">${idx + 1}</span>
             <div>
-              <div class="text-xs font-bold text-slate-200">${step.from} → ${step.to}</div>
+              <div class="text-xs font-bold ${isActive ? 'text-white' : 'text-slate-300'}">${step.from} → ${step.to}</div>
               <div class="text-[10px] text-slate-500">Short Name: ${step.displayName}</div>
             </div>
           </div>
-          <span class="text-xs font-mono font-bold text-slate-400">${step.distance}m</span>
+          <span class="text-xs font-mono font-bold ${isActive ? 'text-red-400' : 'text-slate-400'}">${step.distance}m</span>
         `;
         stepsContainer.appendChild(item);
       });
-
-      pathSummary.textContent = `Route: ${path.join(" → ")}`;
-      logSerial(`Calculated route: ${start} -> ${dest} (${distance}m)`);
-      drawMap();
     }
 
     function logSerial(msg) {
@@ -421,28 +444,116 @@
       serialLog.scrollTop = serialLog.scrollHeight;
     }
 
-    // Web Serial API implementation
+    // Serial Communication Protocol Matching Python main.py & Arduino control_panel.ino
+    async function sendSerialLine(text) {
+      if (writer) {
+        logSerial(`[WEB -> ARDUINO] ${text}`);
+        await writer.write(new TextEncoder().encode(text + "\n"));
+      }
+    }
+
+    async function sendRouteToArduino(steps, totalDistance) {
+      if (!writer) return;
+
+      await sendSerialLine("BEGIN");
+      await sendSerialLine(`TOTAL|${totalDistance}`);
+
+      for (const step of steps) {
+        await sendSerialLine(`STEP|${step.displayName}|${step.distance}`);
+      }
+
+      await sendSerialLine("END");
+    }
+
+    // Parse incoming serial data from control_panel.ino
+    function handleIncomingSerialCommand(line) {
+      line = line.trim();
+      logSerial(`[ARDUINO -> WEB] ${line}`);
+
+      // Protocol: ROUTE|WMC|TASC1
+      if (line.startsWith("ROUTE|")) {
+        const parts = line.split("|");
+        if (parts.length === 3) {
+          const start = parts[1];
+          const dest = parts[2];
+          if (LANDMARKS.includes(start) && LANDMARKS.includes(dest)) {
+            startSelect.value = start;
+            destSelect.value = dest;
+            calculateAndDisplay(true);
+          }
+        }
+      } 
+      else if (line === "NEXT") {
+        if (currentSteps.length > 0) {
+          activeStepSegment = Math.min(activeStepSegment + 1, currentSteps.length - 1);
+          renderStepList();
+        }
+      } 
+      else if (line === "PREVIOUS") {
+        if (currentSteps.length > 0) {
+          activeStepSegment = Math.max(activeStepSegment - 1, 0);
+          renderStepList();
+        }
+      } 
+      else if (line === "ARRIVED" || line === "RESET") {
+        activeStepSegment = 0;
+        renderStepList();
+      }
+    }
+
+    async function listenToSerial() {
+      const textDecoder = new TextDecoderStream();
+      const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+      reader = textDecoder.readable.getReader();
+
+      let buffer = "";
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value) {
+            buffer += value;
+            const lines = buffer.split("\n");
+            buffer = lines.pop(); // Keep partial trailing line
+            lines.forEach(line => handleIncomingSerialCommand(line));
+          }
+        }
+      } catch (err) {
+        logSerial("Serial Read Error: " + err.message);
+      }
+    }
+
+    // Connect Web Serial API
     document.getElementById("connect-btn").addEventListener("click", async () => {
       if ("serial" in navigator) {
         try {
-          const port = await navigator.serial.requestPort();
+          port = await navigator.serial.requestPort();
           await port.open({ baudRate: 115200 });
+
+          const textEncoder = new TextEncoderStream();
+          const writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
+          writer = textEncoder.writable.getWriter();
+
           document.getElementById("serial-status").textContent = "CONNECTED";
           document.getElementById("serial-status").className = "text-[10px] text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800";
-          logSerial("Connected to Arduino hardware serial!");
+          document.getElementById("serial-btn-text").textContent = "Serial Connected (115200)";
+          document.getElementById("serial-dot").className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
+
+          logSerial("Connected to Arduino Hardware!");
+          listenToSerial();
         } catch (err) {
-          logSerial("Serial Connection Failed: " + err.message);
+          logSerial("Connection Failed: " + err.message);
         }
       } else {
-        alert("Web Serial API is not supported in this browser. Try Google Chrome or Edge.");
+        alert("Web Serial API is supported in Google Chrome and Microsoft Edge.");
       }
     });
 
-    document.getElementById("calc-btn").addEventListener("click", calculateAndDisplay);
+    document.getElementById("calc-btn").addEventListener("click", () => calculateAndDisplay(false));
 
     initSelects();
     setupCanvasSize();
-    calculateAndDisplay();
+    calculateAndDisplay(false);
   </script>
 </body>
 </html>
