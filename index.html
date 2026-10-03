@@ -98,16 +98,16 @@
       <div class="flex items-center justify-between mb-4">
         <div>
           <h2 class="text-lg font-bold text-white">SFU Campus Layout Map</h2>
-          <p class="text-xs text-slate-400">Node-based pathway graph representation</p>
+          <p class="text-xs text-slate-400">Node-based pathway graph overlaid on SFU Burnaby Campus map</p>
         </div>
         <div class="flex items-center gap-4 text-xs text-slate-400">
           <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span> Landmark</span>
-          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-slate-600 inline-block"></span> Routing Node</span>
+          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block"></span> Routing Node</span>
         </div>
       </div>
 
       <!-- Canvas Box -->
-      <div class="relative w-full aspect-[4/3] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex items-center justify-center">
+      <div class="relative w-full aspect-[16/10] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex items-center justify-center">
         <canvas id="map-canvas" class="w-full h-full object-contain"></canvas>
       </div>
 
@@ -168,30 +168,40 @@
       "TASC2": { "TASC_JUNCTION": 55, "TASC1": 50 }
     };
 
-    // 2D Map positions
+    // Recalibrated node positions to align with the Burnaby Campus Accessibility Map
     const NODE_POSITIONS = {
-      "WMC": { x: 100, y: 100 },
-      "WMC_EAST": { x: 200, y: 100 },
-      "LIBRARY_WEST": { x: 300, y: 140 },
-      "Library": { x: 260, y: 220 },
-      "SUB": { x: 340, y: 220 },
-      "CONVOCATION_WEST": { x: 420, y: 160 },
-      "CONVOCATION_CENTRE": { x: 500, y: 180 },
-      "MBC": { x: 460, y: 260 },
-      "AQ_WEST": { x: 580, y: 200 },
-      "AQ": { x: 660, y: 180 },
-      "AQ_SOUTH": { x: 620, y: 280 },
-      "SHRUM_NORTH": { x: 620, y: 360 },
-      "Shrum Chemistry": { x: 520, y: 380 },
-      "Shrum Physics": { x: 560, y: 460 },
-      "Shrum Biology": { x: 660, y: 460 },
-      "SHRUM_SOUTH": { x: 620, y: 520 },
-      "South Sciences": { x: 520, y: 560 },
-      "ASB_WEST": { x: 680, y: 580 },
-      "ASB": { x: 620, y: 640 },
-      "TASC_JUNCTION": { x: 780, y: 620 },
-      "TASC1": { x: 860, y: 580 },
-      "TASC2": { x: 880, y: 660 }
+      "WMC": { x: 408, y: 260 },
+      "WMC_EAST": { x: 425, y: 260 },
+      "LIBRARY_WEST": { x: 470, y: 275 },
+      "Library": { x: 485, y: 290 },
+      "SUB": { x: 480, y: 315 },
+      "CONVOCATION_WEST": { x: 505, y: 280 },
+      "CONVOCATION_CENTRE": { x: 520, y: 280 },
+      "MBC": { x: 505, y: 300 },
+      "AQ_WEST": { x: 535, y: 280 },
+      "AQ": { x: 550, y: 300 },
+      "AQ_SOUTH": { x: 550, y: 330 },
+      "SHRUM_NORTH": { x: 555, y: 355 },
+      "Shrum Chemistry": { x: 540, y: 360 },
+      "Shrum Physics": { x: 565, y: 360 },
+      "Shrum Biology": { x: 590, y: 360 },
+      "SHRUM_SOUTH": { x: 575, y: 380 },
+      "South Sciences": { x: 555, y: 400 },
+      "ASB_WEST": { x: 605, y: 380 },
+      "ASB": { x: 610, y: 395 },
+      "TASC_JUNCTION": { x: 630, y: 380 },
+      "TASC1": { x: 630, y: 350 },
+      "TASC2": { x: 645, y: 360 }
+    };
+
+    // Load SFU Campus Map Background Image
+    const mapImage = new Image();
+    mapImage.src = 'https://raw.githubusercontent.com/Waog88/SFU-Compass/main/map_background.jpg';
+    let imageLoaded = false;
+
+    mapImage.onload = () => {
+      imageLoaded = true;
+      drawMap();
     };
 
     // Shortest path algorithm matching dijkstra.py
@@ -317,16 +327,24 @@
 
     function setupCanvasSize() {
       canvas.width = 1000;
-      canvas.height = 750;
+      canvas.height = 625;
       drawMap();
     }
 
     function drawMap() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw map edges
+      // 1. Draw Map Background Image
+      if (imageLoaded) {
+        ctx.drawImage(mapImage, 0, 0, canvas.width, canvas.height);
+      } else {
+        ctx.fillStyle = "#020617";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      // 2. Draw map graph edges
       ctx.lineWidth = 3;
-      ctx.strokeStyle = "#334155";
+      ctx.strokeStyle = "rgba(15, 23, 42, 0.4)";
       for (const node in GRAPH) {
         const startPos = NODE_POSITIONS[node];
         for (const neighbor in GRAPH[node]) {
@@ -340,10 +358,25 @@
         }
       }
 
-      // Draw active route path
+      // 3. Draw active route path (Glow + Line)
       if (currentRoutePath.length > 1) {
-        ctx.lineWidth = 7;
-        ctx.strokeStyle = "#ef4444";
+        // Outer Glow
+        ctx.lineWidth = 10;
+        ctx.strokeStyle = "rgba(239, 68, 68, 0.4)";
+        ctx.beginPath();
+        for (let i = 0; i < currentRoutePath.length - 1; i++) {
+          const u = NODE_POSITIONS[currentRoutePath[i]];
+          const v = NODE_POSITIONS[currentRoutePath[i + 1]];
+          if (u && v) {
+            ctx.moveTo(u.x, u.y);
+            ctx.lineTo(v.x, v.y);
+          }
+        }
+        ctx.stroke();
+
+        // Core Line
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#dc2626";
         ctx.beginPath();
         for (let i = 0; i < currentRoutePath.length - 1; i++) {
           const u = NODE_POSITIONS[currentRoutePath[i]];
@@ -356,28 +389,41 @@
         ctx.stroke();
       }
 
-      // Draw nodes
+      // 4. Draw Nodes and Labels
       for (const node in NODE_POSITIONS) {
         const pos = NODE_POSITIONS[node];
         const isLandmark = LANDMARKS.includes(node);
         const isSelected = currentRoutePath.includes(node);
 
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, isLandmark ? 10 : 5, 0, Math.PI * 2);
+        ctx.arc(pos.x, pos.y, isLandmark ? 6 : 3, 0, Math.PI * 2);
 
         if (isSelected) {
-          ctx.fillStyle = "#f87171";
+          ctx.fillStyle = "#ef4444";
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 2;
+          ctx.fill();
+          ctx.stroke();
         } else if (isLandmark) {
-          ctx.fillStyle = "#dc2626";
+          ctx.fillStyle = "#991b1b";
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 1.5;
+          ctx.fill();
+          ctx.stroke();
         } else {
-          ctx.fillStyle = "#64748b";
+          ctx.fillStyle = "rgba(100, 116, 139, 0.8)";
+          ctx.fill();
         }
-        ctx.fill();
 
         if (isLandmark) {
-          ctx.font = "bold 12px sans-serif";
-          ctx.fillStyle = isSelected ? "#ffffff" : "#94a3b8";
-          ctx.fillText(node, pos.x + 14, pos.y + 4);
+          ctx.font = "900 11px sans-serif";
+          
+          // Label Shadow for readability on top of map
+          ctx.fillStyle = "#000000";
+          ctx.fillText(node, pos.x + 9, pos.y + 4);
+          
+          ctx.fillStyle = isSelected ? "#ef4444" : "#ffffff";
+          ctx.fillText(node, pos.x + 8, pos.y + 3);
         }
       }
     }
@@ -407,7 +453,6 @@
       logSerial(`Route computed: ${start} -> ${dest} (${distance}m)`);
       drawMap();
 
-      // If serial is connected, send instructions back to control_panel.ino
       sendRouteToArduino(currentSteps, distance);
     }
 
@@ -444,7 +489,6 @@
       serialLog.scrollTop = serialLog.scrollHeight;
     }
 
-    // Serial Communication Protocol Matching Python main.py & Arduino control_panel.ino
     async function sendSerialLine(text) {
       if (writer) {
         logSerial(`[WEB -> ARDUINO] ${text}`);
@@ -465,12 +509,10 @@
       await sendSerialLine("END");
     }
 
-    // Parse incoming serial data from control_panel.ino
     function handleIncomingSerialCommand(line) {
       line = line.trim();
       logSerial(`[ARDUINO -> WEB] ${line}`);
 
-      // Protocol: ROUTE|WMC|TASC1
       if (line.startsWith("ROUTE|")) {
         const parts = line.split("|");
         if (parts.length === 3) {
@@ -514,7 +556,7 @@
           if (value) {
             buffer += value;
             const lines = buffer.split("\n");
-            buffer = lines.pop(); // Keep partial trailing line
+            buffer = lines.pop();
             lines.forEach(line => handleIncomingSerialCommand(line));
           }
         }
@@ -523,7 +565,6 @@
       }
     }
 
-    // Connect Web Serial API
     document.getElementById("connect-btn").addEventListener("click", async () => {
       if ("serial" in navigator) {
         try {
