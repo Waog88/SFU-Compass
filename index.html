@@ -1,4 +1,110 @@
-<script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SFU Compass</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-slate-950 border-b border-slate-800 p-4 sticky top-0 z-50 shadow-md">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center font-black text-xl text-white shadow-lg shadow-red-900/30">SFU</div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight">SFU Compass</h1>
+          <p class="text-xs text-slate-400">Campus Navigation & Route Finder</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button id="connect-btn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow">
+          <span id="serial-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+          <span id="serial-btn-text">Connect Hardware</span>
+        </button>
+        <span id="serial-status" class="text-[10px] text-slate-400 bg-slate-950 px-2 py-1 rounded border border-slate-800">DISCONNECTED</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow">
+    
+    <!-- Controls & Step Panel (Left) -->
+    <div class="lg:col-span-4 flex flex-col gap-5">
+      
+      <!-- Selector Card -->
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          Select Waypoints
+        </h2>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">START LOCATION</label>
+            <select id="start-select" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none text-white"></select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">DESTINATION</label>
+            <select id="dest-select" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none text-white"></select>
+          </div>
+
+          <button id="calc-btn" class="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-lg shadow-red-900/40 transition-all text-sm flex items-center justify-center gap-2">
+            Calculate Route
+          </button>
+        </div>
+      </div>
+
+      <!-- Route Directions Steps -->
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 shadow-xl flex-grow flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider">Directions</h2>
+          <span id="route-distance-badge" class="hidden text-xs bg-red-950 border border-red-800 text-red-400 font-bold px-2.5 py-0.5 rounded-full">0m</span>
+        </div>
+
+        <div id="active-step-indicator" class="text-[10px] text-slate-500 mb-2 font-mono">STEP 0/0</div>
+
+        <div id="steps-container" class="space-y-2 overflow-y-auto max-h-[300px] pr-1">
+          <p class="text-xs text-slate-500 italic">Select start and destination to calculate a path.</p>
+        </div>
+
+        <div id="path-summary" class="mt-4 pt-3 border-t border-slate-800/80 text-[11px] font-mono text-slate-400 break-words"></div>
+      </div>
+
+      <!-- Serial Debug Terminal -->
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 shadow-xl">
+        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Hardware Console</h3>
+        <div id="serial-log" class="bg-slate-900 border border-slate-800 rounded-lg p-2.5 h-24 overflow-y-auto font-mono text-[10px] text-emerald-400 space-y-1">
+          <div>> Console ready...</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Map Canvas Panel (Right) -->
+    <div class="lg:col-span-8 flex flex-col gap-2">
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3 shadow-xl flex flex-col h-full">
+        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+          <div class="text-xs text-slate-400 flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+            <span>Interactive Campus Map</span>
+          </div>
+          <div class="text-[11px] text-slate-500">Scroll to Zoom • Drag to Pan</div>
+        </div>
+
+        <div class="relative w-full h-[550px] lg:h-[680px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing">
+          <canvas id="map-canvas" class="w-full h-full object-contain"></canvas>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
     // Landmark Config
     const LANDMARKS = [
       "WMC", "Library", "SUB", "MBC", "AQ", 
@@ -39,7 +145,7 @@
       "TASC2": { "TASC_JUNCTION": 55, "TASC1": 50 }
     };
 
-    // Adjusted Coordinates for High Resolution Canvas (1600x1200)
+    // Coordinates for 1600x1100 Canvas
     const NODE_POSITIONS = {
       "WMC": { x: 700, y: 435 },
       "WMC_EAST": { x: 738, y: 445 },
@@ -73,7 +179,7 @@
     const canvas = document.getElementById("map-canvas");
     const ctx = canvas.getContext("2d");
 
-    // Pan & Zoom Variables
+    // Zoom & Pan Setup
     let scale = 1.3;
     let panX = -250;
     let panY = -150;
@@ -181,7 +287,6 @@
 
     let port = null;
     let writer = null;
-    let reader = null;
 
     function initSelects() {
       LANDMARKS.forEach(landmark => {
@@ -210,11 +315,9 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       ctx.save();
-      // Apply Pan and Zoom Transforms
       ctx.translate(panX, panY);
       ctx.scale(scale, scale);
 
-      // 1. Draw Map Image
       if (mapImage.complete && mapImage.naturalWidth !== 0) {
         ctx.drawImage(mapImage, 0, 0, canvas.width, canvas.height);
       } else {
@@ -222,7 +325,7 @@
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
-      // 2. Base Network Graph Connections
+      // Base network
       ctx.lineWidth = 3;
       ctx.strokeStyle = "rgba(71, 85, 105, 0.5)";
       for (const node in GRAPH) {
@@ -238,7 +341,7 @@
         }
       }
 
-      // 3. Highlight Route Line
+      // Highlighted Route
       if (currentRoutePath.length > 1) {
         ctx.shadowColor = "#ef4444";
         ctx.shadowBlur = 15;
@@ -258,7 +361,7 @@
         ctx.shadowBlur = 0;
       }
 
-      // 4. Draw Landmark Markers & Labels
+      // Landmark Nodes & Text Labels
       for (const node in NODE_POSITIONS) {
         const pos = NODE_POSITIONS[node];
         const isLandmark = LANDMARKS.includes(node);
@@ -284,20 +387,17 @@
         ctx.fill();
         ctx.stroke();
 
-        // Render High-Contrast Label Badges for Landmarks
         if (isLandmark) {
           const labelText = node;
           ctx.font = isSelected ? "bold 15px sans-serif" : "bold 13px sans-serif";
           const textWidth = ctx.measureText(labelText).width;
 
-          // Background pill label
           ctx.fillStyle = isSelected ? "rgba(185, 28, 28, 0.9)" : "rgba(15, 23, 42, 0.85)";
           ctx.fillRect(pos.x + 14, pos.y - 12, textWidth + 10, 20);
           ctx.strokeStyle = isSelected ? "#fca5a5" : "#475569";
           ctx.lineWidth = 1;
           ctx.strokeRect(pos.x + 14, pos.y - 12, textWidth + 10, 20);
 
-          // Label Text
           ctx.fillStyle = "#ffffff";
           ctx.fillText(labelText, pos.x + 19, pos.y + 2);
         }
@@ -306,12 +406,11 @@
       ctx.restore();
     }
 
-    // Pan & Zoom Event Listeners
+    // Pan / Zoom Controls
     canvas.addEventListener("mousedown", (e) => {
       isDragging = true;
       startX = e.clientX - panX;
       startY = e.clientY - panY;
-      canvas.style.cursor = "grabbing";
     });
 
     canvas.addEventListener("mousemove", (e) => {
@@ -321,28 +420,20 @@
       drawMap();
     });
 
-    canvas.addEventListener("mouseup", () => {
-      isDragging = false;
-      canvas.style.cursor = "grab";
-    });
-
-    canvas.addEventListener("mouseleave", () => {
-      isDragging = false;
-      canvas.style.cursor = "grab";
-    });
+    canvas.addEventListener("mouseup", () => isDragging = false);
+    canvas.addEventListener("mouseleave", () => isDragging = false);
 
     canvas.addEventListener("wheel", (e) => {
       e.preventDefault();
-      const zoomFactor = 1.1;
       if (e.deltaY < 0) {
-        scale = Math.min(scale * zoomFactor, 3.5);
+        scale = Math.min(scale * 1.1, 3.5);
       } else {
-        scale = Math.max(scale / zoomFactor, 0.6);
+        scale = Math.max(scale / 1.1, 0.6);
       }
       drawMap();
     }, { passive: false });
 
-    function calculateAndDisplay(fromSerial = false) {
+    function calculateAndDisplay() {
       const start = startSelect.value;
       const dest = destSelect.value;
 
@@ -366,8 +457,6 @@
       pathSummary.textContent = `Route: ${path.join(" → ")}`;
       logSerial(`Route computed: ${start} -> ${dest} (${distance}m)`);
       drawMap();
-
-      sendRouteToArduino(currentSteps, distance);
     }
 
     function renderStepList() {
@@ -380,7 +469,7 @@
         item.className = `p-3 rounded-xl flex items-center justify-between border transition-all ${
           isActive 
             ? "bg-red-950/70 border-red-500 shadow-md scale-[1.01]" 
-            : "bg-slate-950/80 border-slate-800 opacity-80"
+            : "bg-slate-900 border-slate-800 opacity-80"
         }`;
         item.innerHTML = `
           <div class="flex items-center gap-3">
@@ -403,110 +492,29 @@
       serialLog.scrollTop = serialLog.scrollHeight;
     }
 
-    async function sendSerialLine(text) {
-      if (writer) {
-        logSerial(`[WEB -> ARDUINO] ${text}`);
-        await writer.write(new TextEncoder().encode(text + "\n"));
-      }
-    }
-
-    async function sendRouteToArduino(steps, totalDistance) {
-      if (!writer) return;
-
-      await sendSerialLine("BEGIN");
-      await sendSerialLine(`TOTAL|${totalDistance}`);
-
-      for (const step of steps) {
-        await sendSerialLine(`STEP|${step.displayName}|${step.distance}`);
-      }
-
-      await sendSerialLine("END");
-    }
-
-    function handleIncomingSerialCommand(line) {
-      line = line.trim();
-      logSerial(`[ARDUINO -> WEB] ${line}`);
-
-      if (line.startsWith("ROUTE|")) {
-        const parts = line.split("|");
-        if (parts.length === 3) {
-          const start = parts[1];
-          const dest = parts[2];
-          if (LANDMARKS.includes(start) && LANDMARKS.includes(dest)) {
-            startSelect.value = start;
-            destSelect.value = dest;
-            calculateAndDisplay(true);
-          }
-        }
-      } 
-      else if (line === "NEXT") {
-        if (currentSteps.length > 0) {
-          activeStepSegment = Math.min(activeStepSegment + 1, currentSteps.length - 1);
-          renderStepList();
-        }
-      } 
-      else if (line === "PREVIOUS") {
-        if (currentSteps.length > 0) {
-          activeStepSegment = Math.max(activeStepSegment - 1, 0);
-          renderStepList();
-        }
-      } 
-      else if (line === "ARRIVED" || line === "RESET") {
-        activeStepSegment = 0;
-        renderStepList();
-      }
-    }
-
-    async function listenToSerial() {
-      const textDecoder = new TextDecoderStream();
-      const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
-      reader = textDecoder.readable.getReader();
-
-      let buffer = "";
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          if (value) {
-            buffer += value;
-            const lines = buffer.split("\n");
-            buffer = lines.pop();
-            lines.forEach(line => handleIncomingSerialCommand(line));
-          }
-        }
-      } catch (err) {
-        logSerial("Serial Read Error: " + err.message);
-      }
-    }
-
     document.getElementById("connect-btn").addEventListener("click", async () => {
       if ("serial" in navigator) {
         try {
           port = await navigator.serial.requestPort();
           await port.open({ baudRate: 115200 });
-
-          const textEncoder = new TextEncoderStream();
-          const writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
-          writer = textEncoder.writable.getWriter();
-
           document.getElementById("serial-status").textContent = "CONNECTED";
           document.getElementById("serial-status").className = "text-[10px] text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800";
-          document.getElementById("serial-btn-text").textContent = "Serial Connected (115200)";
+          document.getElementById("serial-btn-text").textContent = "Serial Connected";
           document.getElementById("serial-dot").className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
-
-          logSerial("Connected to Arduino Hardware!");
-          listenToSerial();
+          logSerial("Connected to Serial!");
         } catch (err) {
-          logSerial("Connection Failed: " + err.message);
+          logSerial("Connection error: " + err.message);
         }
       } else {
-        alert("Web Serial API is supported in Google Chrome and Microsoft Edge.");
+        alert("Web Serial API is supported on Chrome and Edge.");
       }
     });
 
-    document.getElementById("calc-btn").addEventListener("click", () => calculateAndDisplay(false));
+    document.getElementById("calc-btn").addEventListener("click", () => calculateAndDisplay());
 
     initSelects();
     setupCanvasSize();
-    calculateAndDisplay(false);
+    calculateAndDisplay();
   </script>
+</body>
+</html>
