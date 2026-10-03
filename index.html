@@ -5,13 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SFU Navigator - Campus Kiosk</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    @keyframes pulse-glow {
-      0%, 100% { opacity: 0.4; transform: scale(1); }
-      50% { opacity: 0.9; transform: scale(1.15); }
-    }
-    .node-pulse { animation: pulse-glow 2s infinite ease-in-out; }
-  </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col">
 
@@ -24,7 +17,7 @@
         </div>
         <div>
           <h1 class="text-xl font-bold tracking-tight text-white">SFU Navigator</h1>
-          <p class="text-xs text-slate-400">Campus Kiosk & Real-time Web Map</p>
+          <p class="text-xs text-slate-400">Campus Kiosk & Visual Overlay Map</p>
         </div>
       </div>
       
@@ -40,10 +33,10 @@
   <!-- Main Grid Layout -->
   <main class="flex-1 max-w-7xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 p-4 md:p-6">
     
-    <!-- Sidebar Controls & Turn-by-Turn Panel -->
+    <!-- Sidebar Controls -->
     <div class="lg:col-span-4 flex flex-col gap-6">
       
-      <!-- Destination Selector Card -->
+      <!-- Destination Selector -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
         <h2 class="text-sm uppercase tracking-wider font-semibold text-slate-400 mb-4 flex items-center justify-between">
           <span>Route Planner</span>
@@ -69,50 +62,50 @@
         </div>
       </div>
 
-      <!-- Turn-by-Turn Step Guidance -->
+      <!-- Step Guidance -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col">
         <h2 class="text-sm uppercase tracking-wider font-semibold text-slate-400 mb-3 flex items-center justify-between">
           <span>Step-by-Step Directions</span>
           <span id="active-step-indicator" class="text-[10px] text-red-400 font-mono">STEP 0/0</span>
         </h2>
-        <div id="steps-container" class="space-y-3 overflow-y-auto max-h-[350px] pr-1 flex-1">
-          <p class="text-sm text-slate-500 italic py-4 text-center">Select a start and destination to display instructions.</p>
+        <div id="steps-container" class="space-y-3 overflow-y-auto max-h-[300px] pr-1 flex-1">
+          <p class="text-sm text-slate-500 italic py-4 text-center">Select start and destination to calculate.</p>
         </div>
       </div>
 
-      <!-- Hardware Serial Stream Monitor -->
+      <!-- Serial Terminal Monitor -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-xs uppercase tracking-wider font-semibold text-slate-400">Serial Data Monitor</h2>
           <span id="serial-status" class="text-[10px] text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">DISCONNECTED</span>
         </div>
-        <div id="serial-log" class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 h-28 overflow-y-auto font-mono text-[11px] text-emerald-400 space-y-1">
-          <div class="text-slate-600">// Waiting for Arduino serial hardware data...</div>
+        <div id="serial-log" class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 h-24 overflow-y-auto font-mono text-[11px] text-emerald-400 space-y-1">
+          <div class="text-slate-600">// Serial logs display here...</div>
         </div>
       </div>
 
     </div>
 
-    <!-- Map Canvas Display -->
+    <!-- Map Display with Image Canvas Overlay -->
     <div class="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6 shadow-xl flex flex-col justify-between">
       <div class="flex items-center justify-between mb-4">
         <div>
-          <h2 class="text-lg font-bold text-white">SFU Campus Layout Map</h2>
-          <p class="text-xs text-slate-400">Node-based pathway graph overlaid on SFU Burnaby Campus map</p>
+          <h2 class="text-lg font-bold text-white">SFU Campus Map Overlay</h2>
+          <p class="text-xs text-slate-400">Real-time navigation paths rendered directly onto SFU Burnaby Campus map</p>
         </div>
         <div class="flex items-center gap-4 text-xs text-slate-400">
-          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span> Landmark</span>
-          <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-slate-400 inline-block"></span> Routing Node</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-600 inline-block border border-white"></span> Landmark Pin</span>
+          <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-400 inline-block"></span> Waypoint Node</span>
         </div>
       </div>
 
-      <!-- Canvas Box -->
-      <div class="relative w-full aspect-[16/10] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex items-center justify-center">
+      <!-- Canvas Container -->
+      <div class="relative w-full aspect-[4/3] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex items-center justify-center shadow-inner">
         <canvas id="map-canvas" class="w-full h-full object-contain"></canvas>
       </div>
 
       <div class="mt-4 flex items-center justify-between text-xs text-slate-500 border-t border-slate-800/60 pt-3">
-        <span>SFU Academic Quadrangle & Campus Extension</span>
+        <span>Map Source: SFU Burnaby Accessibility & Campus Map</span>
         <span id="path-summary">Nodes in Graph: 22</span>
       </div>
     </div>
@@ -120,7 +113,7 @@
   </main>
 
   <script>
-    // Configuration matching config.py & control_panel.ino
+    // Landmark Config
     const LANDMARKS = [
       "WMC", "Library", "SUB", "MBC", "AQ", 
       "Shrum Chemistry", "Shrum Physics", "Shrum Biology", 
@@ -128,21 +121,13 @@
     ];
 
     const SHORT_NAMES = {
-      "WMC": "WMC",
-      "Library": "LIBRARY",
-      "SUB": "SUB",
-      "MBC": "MBC",
-      "AQ": "AQ",
-      "Shrum Chemistry": "SHRUM CHEM",
-      "Shrum Physics": "SHRUM PHYS",
-      "Shrum Biology": "SHRUM BIO",
-      "South Sciences": "SOUTH SCI",
-      "ASB": "ASB",
-      "TASC1": "TASC 1",
-      "TASC2": "TASC 2"
+      "WMC": "WMC", "Library": "LIBRARY", "SUB": "SUB", "MBC": "MBC",
+      "AQ": "AQ", "Shrum Chemistry": "SHRUM CHEM", "Shrum Physics": "SHRUM PHYS",
+      "Shrum Biology": "SHRUM BIO", "South Sciences": "SOUTH SCI", "ASB": "ASB",
+      "TASC1": "TASC 1", "TASC2": "TASC 2"
     };
 
-    // Campus Graph from graph.py
+    // Graph Distances
     const GRAPH = {
       "WMC": { "WMC_EAST": 25 },
       "WMC_EAST": { "WMC": 25, "LIBRARY_WEST": 120 },
@@ -168,51 +153,44 @@
       "TASC2": { "TASC_JUNCTION": 55, "TASC1": 50 }
     };
 
-    // Recalibrated node positions to align with the Burnaby Campus Accessibility Map
+    // Aligned Pixel Coordinates for SFU Burnaby Map (1000x700 resolution canvas)
     const NODE_POSITIONS = {
-      "WMC": { x: 408, y: 260 },
-      "WMC_EAST": { x: 425, y: 260 },
-      "LIBRARY_WEST": { x: 470, y: 275 },
-      "Library": { x: 485, y: 290 },
-      "SUB": { x: 480, y: 315 },
-      "CONVOCATION_WEST": { x: 505, y: 280 },
-      "CONVOCATION_CENTRE": { x: 520, y: 280 },
-      "MBC": { x: 505, y: 300 },
-      "AQ_WEST": { x: 535, y: 280 },
-      "AQ": { x: 550, y: 300 },
-      "AQ_SOUTH": { x: 550, y: 330 },
-      "SHRUM_NORTH": { x: 555, y: 355 },
-      "Shrum Chemistry": { x: 540, y: 360 },
-      "Shrum Physics": { x: 565, y: 360 },
-      "Shrum Biology": { x: 590, y: 360 },
-      "SHRUM_SOUTH": { x: 575, y: 380 },
-      "South Sciences": { x: 555, y: 400 },
-      "ASB_WEST": { x: 605, y: 380 },
-      "ASB": { x: 610, y: 395 },
-      "TASC_JUNCTION": { x: 630, y: 380 },
-      "TASC1": { x: 630, y: 350 },
-      "TASC2": { x: 645, y: 360 }
+      "WMC": { x: 440, y: 255 },
+      "WMC_EAST": { x: 462, y: 260 },
+      "LIBRARY_WEST": { x: 485, y: 275 },
+      "Library": { x: 495, y: 300 },
+      "SUB": { x: 508, y: 310 },
+      "CONVOCATION_WEST": { x: 485, y: 260 },
+      "CONVOCATION_CENTRE": { x: 512, y: 260 },
+      "MBC": { x: 500, y: 320 },
+      "AQ_WEST": { x: 520, y: 280 },
+      "AQ": { x: 550, y: 280 },
+      "AQ_SOUTH": { x: 535, y: 320 },
+      "SHRUM_NORTH": { x: 540, y: 345 },
+      "Shrum Chemistry": { x: 520, y: 345 },
+      "Shrum Physics": { x: 545, y: 360 },
+      "Shrum Biology": { x: 575, y: 360 },
+      "SHRUM_SOUTH": { x: 550, y: 385 },
+      "South Sciences": { x: 535, y: 405 },
+      "ASB_WEST": { x: 575, y: 395 },
+      "ASB": { x: 590, y: 385 },
+      "TASC_JUNCTION": { x: 615, y: 380 },
+      "TASC1": { x: 620, y: 355 },
+      "TASC2": { x: 645, y: 355 }
     };
 
-    // Load SFU Campus Map Background Image using local file 1667953880770.jpg
-    // Robust Map Image Loader with fallback
-const mapImage = new Image();
+    // Load SFU Map Image
+    const mapImage = new Image();
+    // Base64 / Remote URL fallback for SFU Burnaby map image
+    mapImage.src = "https://raw.githubusercontent.com/Waog88/SFU-Compass/main/sfu_map.jpg";
 
-// 1. Try local path
-mapImage.src = '1667953880770.jpg';
+    const canvas = document.getElementById("map-canvas");
+    const ctx = canvas.getContext("2d");
 
-mapImage.onload = () => {
-  imageLoaded = true;
-  drawMap();
-};
+    mapImage.onload = () => {
+      drawMap();
+    };
 
-mapImage.onerror = () => {
-  // 2. Fallback to raw GitHub user content link
-  console.warn("Local image load failed, trying raw GitHub link...");
-  mapImage.src = 'https://raw.githubusercontent.com/Waog88/SFU-Compass/main/1667953880770.jpg';
-};
-
-    // Shortest path algorithm matching dijkstra.py
     function dijkstra(start, destination) {
       const distances = {};
       const previous = {};
@@ -263,7 +241,6 @@ mapImage.onerror = () => {
       return { path, distance: distances[destination] };
     }
 
-    // Convert node path to steps matching route_builder.py
     function buildSteps(fullPath) {
       if (!fullPath || fullPath.length === 0) return [];
       const steps = [];
@@ -296,9 +273,6 @@ mapImage.onerror = () => {
       return steps;
     }
 
-    // UI Handles
-    const canvas = document.getElementById("map-canvas");
-    const ctx = canvas.getContext("2d");
     const startSelect = document.getElementById("start-select");
     const destSelect = document.getElementById("dest-select");
     const stepsContainer = document.getElementById("steps-container");
@@ -311,7 +285,6 @@ mapImage.onerror = () => {
     let currentSteps = [];
     let activeStepSegment = 0;
 
-    // Web Serial Globals
     let port = null;
     let writer = null;
     let reader = null;
@@ -335,24 +308,24 @@ mapImage.onerror = () => {
 
     function setupCanvasSize() {
       canvas.width = 1000;
-      canvas.height = 625;
+      canvas.height = 700;
       drawMap();
     }
 
     function drawMap() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 1. Draw Map Background Image
-      if (imageLoaded) {
+      // 1. Draw Map Image as background
+      if (mapImage.complete && mapImage.naturalWidth !== 0) {
         ctx.drawImage(mapImage, 0, 0, canvas.width, canvas.height);
       } else {
         ctx.fillStyle = "#020617";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
 
-      // 2. Draw map graph edges
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(15, 23, 42, 0.4)";
+      // 2. Overlay Base Network Graph Connections (Subtle gray lines)
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(100, 116, 139, 0.4)";
       for (const node in GRAPH) {
         const startPos = NODE_POSITIONS[node];
         for (const neighbor in GRAPH[node]) {
@@ -366,25 +339,14 @@ mapImage.onerror = () => {
         }
       }
 
-      // 3. Draw active route path (Glow + Line)
+      // 3. Highlight Selected Route in Glowing Red Line
       if (currentRoutePath.length > 1) {
-        // Outer Glow
-        ctx.lineWidth = 10;
-        ctx.strokeStyle = "rgba(239, 68, 68, 0.4)";
-        ctx.beginPath();
-        for (let i = 0; i < currentRoutePath.length - 1; i++) {
-          const u = NODE_POSITIONS[currentRoutePath[i]];
-          const v = NODE_POSITIONS[currentRoutePath[i + 1]];
-          if (u && v) {
-            ctx.moveTo(u.x, u.y);
-            ctx.lineTo(v.x, v.y);
-          }
-        }
-        ctx.stroke();
-
-        // Core Line
-        ctx.lineWidth = 4;
+        // Red Glow Shadow
+        ctx.shadowColor = "#ef4444";
+        ctx.shadowBlur = 12;
+        ctx.lineWidth = 6;
         ctx.strokeStyle = "#dc2626";
+        
         ctx.beginPath();
         for (let i = 0; i < currentRoutePath.length - 1; i++) {
           const u = NODE_POSITIONS[currentRoutePath[i]];
@@ -395,43 +357,43 @@ mapImage.onerror = () => {
           }
         }
         ctx.stroke();
+        ctx.shadowBlur = 0; // Reset shadow
       }
 
-      // 4. Draw Nodes and Labels
+      // 4. Render Nodes & Landmarks
       for (const node in NODE_POSITIONS) {
         const pos = NODE_POSITIONS[node];
         const isLandmark = LANDMARKS.includes(node);
         const isSelected = currentRoutePath.includes(node);
 
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, isLandmark ? 6 : 3, 0, Math.PI * 2);
+        ctx.arc(pos.x, pos.y, isLandmark ? 8 : 4, 0, Math.PI * 2);
 
         if (isSelected) {
           ctx.fillStyle = "#ef4444";
           ctx.strokeStyle = "#ffffff";
           ctx.lineWidth = 2;
-          ctx.fill();
-          ctx.stroke();
         } else if (isLandmark) {
           ctx.fillStyle = "#991b1b";
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 1.5;
-          ctx.fill();
-          ctx.stroke();
+          ctx.strokeStyle = "#f87171";
+          ctx.lineWidth = 1;
         } else {
-          ctx.fillStyle = "rgba(100, 116, 139, 0.8)";
-          ctx.fill();
+          ctx.fillStyle = "#fbbf24";
+          ctx.strokeStyle = "#78350f";
+          ctx.lineWidth = 1;
         }
+        
+        ctx.fill();
+        ctx.stroke();
 
-        if (isLandmark) {
-          ctx.font = "900 11px sans-serif";
-          
-          // Label Shadow for readability on top of map
-          ctx.fillStyle = "#000000";
-          ctx.fillText(node, pos.x + 9, pos.y + 4);
-          
-          ctx.fillStyle = isSelected ? "#ef4444" : "#ffffff";
-          ctx.fillText(node, pos.x + 8, pos.y + 3);
+        // Labels for Landmarks
+        if (isLandmark && isSelected) {
+          ctx.font = "bold 12px sans-serif";
+          ctx.fillStyle = "#ffffff";
+          ctx.shadowColor = "#000000";
+          ctx.shadowBlur = 4;
+          ctx.fillText(node, pos.x + 12, pos.y + 4);
+          ctx.shadowBlur = 0;
         }
       }
     }
@@ -473,8 +435,8 @@ mapImage.onerror = () => {
         const item = document.createElement("div");
         item.className = `p-3 rounded-xl flex items-center justify-between border transition-all ${
           isActive 
-            ? "bg-red-950/60 border-red-500 shadow-md scale-[1.02]" 
-            : "bg-slate-950 border-slate-800 opacity-80"
+            ? "bg-red-950/70 border-red-500 shadow-md scale-[1.01]" 
+            : "bg-slate-950/80 border-slate-800 opacity-80"
         }`;
         item.innerHTML = `
           <div class="flex items-center gap-3">
