@@ -194,14 +194,19 @@
       "TASC2": { x: 645, y: 360 }
     };
 
-    // Load SFU Campus Map Background Image
+    // Load SFU Campus Map Background Image using local file 1667953880770.jpg
     const mapImage = new Image();
-    mapImage.src = 'https://raw.githubusercontent.com/Waog88/SFU-Compass/main/map_background.jpg';
+    mapImage.src = './1667953880770.jpg';
     let imageLoaded = false;
 
     mapImage.onload = () => {
       imageLoaded = true;
       drawMap();
+    };
+
+    // Fallback if local file relative path needs repo reference
+    mapImage.onerror = () => {
+      mapImage.src = 'https://raw.githubusercontent.com/Waog88/SFU-Compass/main/1667953880770.jpg';
     };
 
     // Shortest path algorithm matching dijkstra.py
