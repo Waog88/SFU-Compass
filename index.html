@@ -30,7 +30,7 @@
       border-top-color: #475569;
     }
 
-    /* Extra safety CSS rule to hide Leaflet attribution container */
+    /* Hide Leaflet attribution container */
     .leaflet-control-attribution {
       display: none !important;
     }
@@ -38,93 +38,292 @@
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col">
 
+  <!-- Header Navigation -->
   <header class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50">
     <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
       <div class="flex items-center space-x-3">
         <div class="bg-[#A6192E] p-2.5 rounded-xl text-white font-black tracking-wider text-xl shadow-lg">SFU</div>
         <div>
           <h1 class="text-xl font-bold tracking-tight text-white">SFU Navigator</h1>
-          <p class="text-xs text-slate-400">Burnaby Campus Interactive Kiosk</p>
+          <p class="text-xs text-slate-400">Burnaby Campus Kiosk & Hardware System</p>
         </div>
       </div>
-      <button id="connect-btn" class="bg-red-600 hover:bg-red-500 text-white font-semibold text-xs px-4 py-2.5 rounded-lg transition-all flex items-center gap-2 shadow-md">
-        <span class="w-2 h-2 rounded-full bg-red-200 animate-ping"></span> Connect Arduino Serial
-      </button>
+
+      <!-- Navigation Tabs & Hardware Indicator -->
+      <div class="flex items-center gap-3">
+        <nav class="flex bg-slate-950 border border-slate-800 p-1 rounded-xl">
+          <button id="tab-nav-btn" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 text-white transition-all">Campus Map</button>
+          <button id="tab-about-btn" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">About</button>
+          <button id="tab-hardware-btn" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">Hardware</button>
+        </nav>
+        
+        <div class="hidden md:flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-xl text-xs text-emerald-400 font-mono">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Arduino .EXE Sync
+        </div>
+      </div>
     </div>
   </header>
 
-  <main class="flex-1 max-w-7xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 p-4 md:p-6">
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6">
     
-    <div class="lg:col-span-4 flex flex-col gap-6">
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-        <h2 class="text-sm uppercase tracking-wider font-semibold text-slate-400 mb-4 flex items-center justify-between">
-          <span>Route Planner</span>
-          <span id="route-distance-badge" class="hidden text-xs bg-red-950 text-red-400 border border-red-800 px-2.5 py-0.5 rounded-full font-bold">0m</span>
-        </h2>
-        
-        <div class="space-y-4">
-          <div>
-            <label class="block text-xs font-medium text-slate-400 mb-1.5">Start Location</label>
-            <select id="start-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-red-500"></select>
+    <!-- VIEW 1: MAP INTERFACE -->
+    <div id="view-map" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- Controls & Steps Sidebar -->
+      <div class="lg:col-span-4 flex flex-col gap-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <h2 class="text-sm uppercase tracking-wider font-semibold text-slate-400 mb-4 flex items-center justify-between">
+            <span>Route Planner</span>
+            <span id="route-distance-badge" class="hidden text-xs bg-red-950 text-red-400 border border-red-800 px-2.5 py-0.5 rounded-full font-bold">0m</span>
+          </h2>
+          
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1.5">Start Location</label>
+              <select id="start-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-red-500"></select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1.5">Destination Landmark</label>
+              <select id="dest-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-red-500"></select>
+            </div>
+            <button id="calc-btn" class="w-full bg-red-600 hover:bg-red-500 text-white font-semibold py-3 rounded-xl transition-all shadow-lg">Calculate Shortest Route</button>
           </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-400 mb-1.5">Destination Landmark</label>
-            <select id="dest-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-red-500"></select>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col">
+          <h2 class="text-sm uppercase tracking-wider font-semibold text-slate-400 mb-3 flex items-center justify-between">
+            <span>Step-by-Step Directions</span>
+            <span id="step-count-badge" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono">0 steps</span>
+          </h2>
+          <div id="steps-container" class="space-y-2.5 overflow-y-auto max-h-[380px] pr-1 flex-1">
+            <p class="text-sm text-slate-500 italic py-4 text-center">Select a start and destination to display instructions.</p>
           </div>
-          <button id="calc-btn" class="w-full bg-red-600 hover:bg-red-500 text-white font-semibold py-3 rounded-xl transition-all shadow-lg">Calculate Shortest Route</button>
         </div>
       </div>
 
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col">
-        <h2 class="text-sm uppercase tracking-wider font-semibold text-slate-400 mb-3 flex items-center justify-between">
-          <span>Step-by-Step Directions</span>
-          <span id="step-count-badge" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono">0 steps</span>
-        </h2>
-        <div id="steps-container" class="space-y-2.5 overflow-y-auto max-h-[300px] pr-1 flex-1">
-          <p class="text-sm text-slate-500 italic py-4 text-center">Select a start and destination to display instructions.</p>
+      <!-- Map Display Area -->
+      <div class="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6 shadow-xl flex flex-col justify-between">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-bold text-white">SFU Burnaby Campus Map</h2>
+            <p class="text-xs text-slate-400">Synced to Official SFU Room Finder Layout</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <button id="reset-view-btn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg transition-all border border-slate-700">Reset View</button>
+            <div class="flex items-center gap-3 text-xs text-slate-400 hidden sm:flex">
+              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-600 inline-block"></span> Landmark</span>
+              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span> Active Route</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="relative w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden" style="height: 520px;">
+          <div id="map" class="w-full h-full z-10"></div>
+        </div>
+
+        <div class="mt-4 flex items-center justify-between text-xs text-slate-500 border-t border-slate-800/60 pt-3">
+          <span>SFU Burnaby Mountain Campus Grid</span>
+          <span id="path-summary">Ready for routing</span>
         </div>
       </div>
 
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-xs uppercase tracking-wider font-semibold text-slate-400">Serial Data Monitor</h2>
-          <span id="serial-status" class="text-[10px] text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">DISCONNECTED</span>
-        </div>
-        <div id="serial-log" class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 h-24 overflow-y-auto font-mono text-[11px] text-emerald-400 space-y-1">
-          <div class="text-slate-600">// Waiting for serial data packet...</div>
-        </div>
-      </div>
     </div>
 
-    <div class="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6 shadow-xl flex flex-col justify-between">
-      <div class="flex items-center justify-between mb-4">
-        <div>
-          <h2 class="text-lg font-bold text-white">SFU Burnaby Campus Map</h2>
-          <p class="text-xs text-slate-400">Synced to Official SFU Room Finder Layout</p>
+    <!-- VIEW 2: ABOUT PAGE -->
+    <div id="view-about" class="hidden space-y-6">
+      
+      <!-- Purpose & Objectives Card -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-xl">
+        <div class="flex items-center justify-between flex-wrap gap-4 mb-4">
+          <div>
+            <span class="text-xs font-mono font-bold text-red-400 uppercase tracking-wider">PROJECT OVERVIEW</span>
+            <h2 class="text-2xl font-bold text-white mt-1">Purpose & Objectives</h2>
+          </div>
+          <!-- GitHub Repository Link Button -->
+          <a href="https://github.com/your-username/your-repo-name" target="_blank" rel="noopener noreferrer" class="bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+            View GitHub Repository
+          </a>
         </div>
-        <div class="flex items-center gap-3">
-          <button id="reset-view-btn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg transition-all border border-slate-700">Reset View</button>
-          <div class="flex items-center gap-3 text-xs text-slate-400 hidden sm:flex">
-            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-600 inline-block"></span> Landmark</span>
-            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span> Active Route</span>
+        <p class="text-slate-300 text-sm leading-relaxed mb-4">
+          The <strong>SFU Navigator</strong> is designed to provide an interactive, accessible kiosk navigation interface for students, faculty, and visitors across the Simon Fraser University Burnaby campus. The platform integrates a graph pathfinding algorithm (Dijkstra) with physical hardware controls.
+        </p>
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs text-slate-400 space-y-2">
+          <div class="font-bold text-slate-200">Executable Architecture Note:</div>
+          <p>The Arduino hardware ecosystem operates in tandem with a custom standalone desktop application (<code class="text-red-400 font-mono">.exe</code>). The executable manages high-speed COM port serial data buffering, hardware interrupts, and coordinate broadcast, powering the entire embedded routing workflow.</p>
+        </div>
+      </div>
+
+      <!-- Group Members -->
+      <div>
+        <h3 class="text-sm uppercase tracking-wider font-semibold text-slate-400 mb-4">Project Group Members</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          <!-- Member 1 -->
+          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-4">
+            <div>
+              <div class="w-12 h-12 rounded-xl bg-red-950 border border-red-800 text-red-400 font-bold text-lg flex items-center justify-center mb-3">ML</div>
+              <h4 class="font-bold text-white text-base">Marcus Lang</h4>
+              <p class="text-xs text-slate-400 mt-2">Project Developer & Hardware Contributor</p>
+            </div>
+            <div class="pt-3 border-t border-slate-800/80 flex flex-col gap-1 text-xs text-slate-400 font-mono">
+              <span class="text-slate-500 text-[10px]">CONTACT</span>
+              <a href="mailto:mll32@sfu.ca" class="text-red-400 hover:underline truncate">mll32@sfu.ca</a>
+            </div>
+          </div>
+
+          <!-- Member 2 -->
+          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-4">
+            <div>
+              <div class="w-12 h-12 rounded-xl bg-red-950 border border-red-800 text-red-400 font-bold text-lg flex items-center justify-center mb-3">MY</div>
+              <h4 class="font-bold text-white text-base">Marlon Yu</h4>
+              <p class="text-xs text-slate-400 mt-2">Project Developer & Hardware Contributor</p>
+            </div>
+            <div class="pt-3 border-t border-slate-800/80 flex flex-col gap-1 text-xs text-slate-400 font-mono">
+              <span class="text-slate-500 text-[10px]">CONTACT</span>
+              <a href="mailto:mya157@sfu.ca" class="text-red-400 hover:underline truncate">mya157@sfu.ca</a>
+            </div>
+          </div>
+
+          <!-- Member 3 -->
+          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-4">
+            <div>
+              <div class="w-12 h-12 rounded-xl bg-red-950 border border-red-800 text-red-400 font-bold text-lg flex items-center justify-center mb-3">AM</div>
+              <h4 class="font-bold text-white text-base">Amirmhadi Mazaheri</h4>
+              <p class="text-xs text-slate-400 mt-2">Project Developer & Software Contributor</p>
+            </div>
+            <div class="pt-3 border-t border-slate-800/80 flex flex-col gap-1 text-xs text-slate-400 font-mono">
+              <span class="text-slate-500 text-[10px]">CONTACT</span>
+              <a href="mailto:ama473@sfu.ca" class="text-red-400 hover:underline truncate">ama473@sfu.ca</a>
+            </div>
+          </div>
+
+          <!-- Member 4 -->
+          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex flex-col justify-between space-y-4">
+            <div>
+              <div class="w-12 h-12 rounded-xl bg-red-950 border border-red-800 text-red-400 font-bold text-lg flex items-center justify-center mb-3">TA</div>
+              <h4 class="font-bold text-white text-base">Taha Arkian</h4>
+              <p class="text-xs text-slate-400 mt-2">Project Developer & Software Contributor</p>
+            </div>
+            <div class="pt-3 border-t border-slate-800/80 flex flex-col gap-1 text-xs text-slate-400 font-mono">
+              <span class="text-slate-500 text-[10px]">CONTACT</span>
+              <a href="mailto:taa83@sfu.ca" class="text-red-400 hover:underline truncate">taa83@sfu.ca</a>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+
+    <!-- VIEW 3: HARDWARE PAGE -->
+    <div id="view-hardware" class="hidden space-y-6">
+      
+      <!-- Component Breakdown Grid -->
+      <div>
+        <h3 class="text-sm uppercase tracking-wider font-semibold text-slate-400 mb-4">Hardware Component Inventory</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl">
+            <div class="text-red-400 text-xs font-mono font-bold mb-1">MAIN BOARD</div>
+            <h4 class="font-bold text-white mb-2">Arduino Uno R4 WiFi</h4>
+            <p class="text-xs text-slate-400 leading-relaxed">Handles core logic, signal processing, and communicates with the desktop system via UART over USB.</p>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl">
+            <div class="text-red-400 text-xs font-mono font-bold mb-1">OUTPUT DISPLAY</div>
+            <h4 class="font-bold text-white mb-2">LCD Screen Module</h4>
+            <p class="text-xs text-slate-400 leading-relaxed">Displays live status, node selection feedback, and serial connection state directly on the physical hardware setup.</p>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl">
+            <div class="text-red-400 text-xs font-mono font-bold mb-1">ANALOG INPUT</div>
+            <h4 class="font-bold text-white mb-2">2-Axis Joystick Component</h4>
+            <p class="text-xs text-slate-400 leading-relaxed">Allows intuitive manual navigation through menu landmarks and input triggers on the physical kiosk.</p>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl">
+            <div class="text-red-400 text-xs font-mono font-bold mb-1">BREADBOARD & WIRING</div>
+            <h4 class="font-bold text-white mb-2">Breadboard & Jumpers</h4>
+            <p class="text-xs text-slate-400 leading-relaxed">Provides organized power routing, common grounding, and pin breakdown connecting all peripherals.</p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Circuit Media Gallery -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Circuit Diagram Slot -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+          <div>
+            <h3 class="text-base font-bold text-white mb-1">Circuit Schematic & Setup</h3>
+            <p class="text-xs text-slate-400 mb-4">Wiring layout connecting Arduino Uno R4 WiFi, LCD display, and joystick.</p>
+          </div>
+          <div class="bg-slate-950 border border-slate-800 rounded-xl h-64 flex flex-col items-center justify-center text-slate-500 overflow-hidden relative group">
+            <img src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80" alt="Circuit Diagram" class="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity" />
+            <span class="absolute bottom-3 left-3 bg-slate-900/90 text-slate-200 text-[11px] px-2.5 py-1 rounded border border-slate-700">Circuit Wiring Diagram</span>
           </div>
         </div>
+
+        <!-- Video Demo Link Container -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+          <div>
+            <h3 class="text-base font-bold text-white mb-1">Video Demonstration</h3>
+            <p class="text-xs text-slate-400 mb-4">Live video showing physical joystick menu controls, LCD feedback, and executable synchronization.</p>
+          </div>
+          <div class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden aspect-video flex items-center justify-center relative">
+            <iframe class="w-full h-full" src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Hardware Demo Video" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+          </div>
+        </div>
+
       </div>
 
-      <div class="relative w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden" style="height: 520px;">
-        <div id="map" class="w-full h-full z-10"></div>
-      </div>
-
-      <div class="mt-4 flex items-center justify-between text-xs text-slate-500 border-t border-slate-800/60 pt-3">
-        <span>SFU Burnaby Mountain Campus Grid</span>
-        <span id="path-summary">Ready for routing</span>
-      </div>
     </div>
 
   </main>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
+    // Tab Navigation Logic
+    const tabNavBtn = document.getElementById("tab-nav-btn");
+    const tabAboutBtn = document.getElementById("tab-about-btn");
+    const tabHardwareBtn = document.getElementById("tab-hardware-btn");
+    
+    const viewMap = document.getElementById("view-map");
+    const viewAbout = document.getElementById("view-about");
+    const viewHardware = document.getElementById("view-hardware");
+
+    function resetTabStyles() {
+      const inactiveClass = "px-3 py-1.5 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
+      tabNavBtn.className = inactiveClass;
+      tabAboutBtn.className = inactiveClass;
+      tabHardwareBtn.className = inactiveClass;
+
+      viewMap.classList.add("hidden");
+      viewAbout.classList.add("hidden");
+      viewHardware.classList.add("hidden");
+    }
+
+    tabNavBtn.addEventListener("click", () => {
+      resetTabStyles();
+      viewMap.classList.remove("hidden");
+      tabNavBtn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 text-white transition-all";
+      setTimeout(() => { map.invalidateSize(); }, 100);
+    });
+
+    tabAboutBtn.addEventListener("click", () => {
+      resetTabStyles();
+      viewAbout.classList.remove("hidden");
+      tabAboutBtn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 text-white transition-all";
+    });
+
+    tabHardwareBtn.addEventListener("click", () => {
+      resetTabStyles();
+      viewHardware.classList.remove("hidden");
+      tabHardwareBtn.className = "px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 text-white transition-all";
+    });
+
     const LANDMARKS = [
       "WMC", "Library", "SUB", "MBC", "AQ", 
       "Shrum Chemistry", "Shrum Physics", "Shrum Biology", 
@@ -206,7 +405,6 @@
       "TASC2": { "TASC_JUNCTION": 55, "TASC1": 50 }
     };
 
-    // Disabled attribution control and locked zoom
     const map = L.map('map', {
       zoomControl: false,
       attributionControl: false,
