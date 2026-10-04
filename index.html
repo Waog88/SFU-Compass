@@ -29,6 +29,11 @@
     .leaflet-tooltip-top.landmark-label-badge::before {
       border-top-color: #475569;
     }
+
+    /* Extra safety CSS rule to hide Leaflet attribution container */
+    .leaflet-control-attribution {
+      display: none !important;
+    }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col">
@@ -201,12 +206,24 @@
       "TASC2": { "TASC_JUNCTION": 55, "TASC1": 50 }
     };
 
-    const map = L.map('map', { zoomControl: false }).setView([49.2782, -122.9160], 16);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    // Disabled attribution control and locked zoom
+    const map = L.map('map', {
+      zoomControl: false,
+      attributionControl: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      touchZoom: false,
+      dragging: false,
+      boxZoom: false,
+      keyboard: false,
+      minZoom: 16,
+      maxZoom: 16
+    }).setView([49.2782, -122.9165], 16);
 
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 18,
-      attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+      minZoom: 16,
+      maxZoom: 16,
+      attribution: ''
     }).addTo(map);
 
     const routeLayerGroup = L.layerGroup().addTo(map);
@@ -242,7 +259,6 @@
           fillOpacity: 0.95
         });
 
-        // Always show the building name tag on the map for landmarks
         if (isLandmark) {
           circleMarker.bindTooltip(node, {
             permanent: true,
@@ -356,16 +372,11 @@
       lastPolyline = L.polyline(latLngs, { color: '#ef4444', weight: 5, opacity: 0.85 });
       routeLayerGroup.addLayer(lastPolyline);
       map.invalidateSize();
-      map.fitBounds(lastPolyline.getBounds(), { padding: [50, 50] });
     }
 
     document.getElementById("calc-btn").addEventListener("click", calculateAndDisplay);
     document.getElementById("reset-view-btn").addEventListener("click", () => {
-      if (lastPolyline) {
-        map.fitBounds(lastPolyline.getBounds(), { padding: [50, 50] });
-      } else {
-        map.setView([49.2782, -122.9160], 16);
-      }
+      map.setView([49.2782, -122.9165], 16);
     });
 
     initSelects();
