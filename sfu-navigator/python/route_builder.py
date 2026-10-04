@@ -1,4 +1,5 @@
 from config import LANDMARKS, SHORT_NAMES
+from matrix_map import mask_for_path
 
 
 def visible_route(full_path):
@@ -29,6 +30,7 @@ def build_steps(graph, full_path):
 
     current_landmark = None
     distance_since_landmark = 0
+    segment_start = 0
 
     for index, node in enumerate(full_path):
 
@@ -56,10 +58,12 @@ def build_steps(graph, full_path):
                     "to": node,
                     "display_name": SHORT_NAMES[node],
                     "distance": distance_since_landmark,
+                    "matrix_mask": mask_for_path(full_path[segment_start:index + 1]),
                 })
 
             current_landmark = node
             distance_since_landmark = 0
+            segment_start = index
 
     return steps
 

@@ -1,0 +1,43 @@
+SFU NAVIGATOR -- DOUBLE-CLICK WINDOWS LAUNCHER
+
+1. Extract the whole ZIP. Do not run it from inside the ZIP viewer.
+2. Upload arduino/navigator/navigator.ino to your UNO R4 WiFi once.
+   Joystick mode is already enabled. Keep campus_map.h beside the sketch.
+   Upload this updated sketch even if you uploaded the earlier version.
+3. Close Arduino Serial Monitor and Serial Plotter.
+4. Double-click START_NAVIGATOR.bat.
+5. Select the Arduino port in the window and click Start navigator.
+6. Choose START and DESTINATION with the joystick on your device.
+
+Python 3.10 or newer, including pip and Tcl/Tk, must be installed for initial
+setup. Download it from https://www.python.org/downloads/windows/ if needed.
+The launcher creates its own .venv and installs pyserial on first use.
+Internet is required for that dependency installation; later launches can
+run offline. No administrator rights are normally needed.
+
+For a standalone .EXE:
+Double-click BUILD_EXE.bat on Windows. It installs PyInstaller and builds
+dist/SFU-Navigator.exe. That resulting EXE includes Python, the backend,
+the graph, and the GUI; the computer running it does not need Python installed.
+The build requires Internet to install its tools. Arduino USB drivers must
+still be available on the machine running the EXE.
+
+The supplied package contains a Windows launcher and build script, not a
+prebuilt Windows EXE. They were prepared on Linux, where a Windows executable
+cannot be built and tested with the available tools.
+
+Stop the navigator before uploading new Arduino firmware. Click Refresh if
+the USB port changes. If the port is busy, close Serial Monitor or any other
+application using that port.
+
+Route data is still approximate; RCB and Saywell are absent from the graph.
+This version gives landmark/distance steps, not verified turn directions,
+live positioning, or audio playback. Python runs on your laptop and USB must
+remain connected. The new window is a local hardware control frontend,
+not a web app. See README.md for wiring and details.
+
+MATRIX MAP UPDATE
+The campus diagram stays lit; the current instruction segment blinks.
+LEFT/RIGHT changes the LCD instruction and the highlighted segment together.
+See docs/matrix-map.png for the schematic layout. Use this updated backend
+with this updated sketch. Rebuild with BUILD_EXE.bat if you made an older EXE.

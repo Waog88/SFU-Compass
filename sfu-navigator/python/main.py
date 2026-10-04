@@ -1,392 +1,148 @@
+"""Run the original pathfinder through one Arduino serial connection."""
+
 import argparse
 import time
-
-from config import LANDMARKS
+from config import LANDMARKS, CONTROL_PORT, MAX_STEPS
 from graph import GRAPH
 from dijkstra import shortest_path
 from route_builder import build_route
 from serial_manager import SerialManager
+from matrix_map import BASE_MASK, unpack_pixels, BASE_PIXELS
 
 
 def calculate_route(start, destination):
-
-    if start not in LANDMARKS:
-        raise ValueError(
-            f"Invalid start landmark: {start}"
-        )
-
-    if destination not in LANDMARKS:
-        raise ValueError(
-            f"Invalid destination landmark: {destination}"
-        )
-
-    path, distance = shortest_path(
-        GRAPH,
-        start,
-        destination,
-    )
-
-    if path is None:
-        return None
-
-    return build_route(
-        GRAPH,
-        path,
-        distance,
-    )
+    if start not in LANDMARKS or destination not in LANDMARKS:
+        raise ValueError("Choose a location from the available landmark list")
+    path, distance = shortest_path(GRAPH, start, destination)
+    return None if path is None else build_route(GRAPH, path, distance)
 
 
-# ============================================================
-# MOCK MODE
-# ============================================================
-
-def mock_mode():
-
-    print()
-    print("SFU NAVIGATOR -- MOCK MODE")
-    print("=" * 40)
-
-    print("\nAvailable locations:\n")
-
-    for location in sorted(LANDMARKS):
-        print(" ", location)
-
-    print()
-
-    start = input(
-        "Start: "
-    ).strip()
-
-    destination = input(
-        "Destination: "
-    ).strip()
-
-    try:
-
-        route = calculate_route(
-            start,
-            destination,
-        )
-
-    except ValueError as error:
-
-        print("\nERROR:", error)
-        return
-
-    if route is None:
-
-        print("\nNo route found.")
-        return
-
-    print("\nRunning Dijkstra...\n")
-
-    print("Internal route:")
-
-    print(
-        " -> ".join(
-            route["full_path"]
-        )
-    )
-
-    print("\nUser route:")
-
-    print(
-        " -> ".join(
-            route["visible_path"]
-        )
-    )
-
-    print(
-        f"\nTotal distance: "
-        f"{route['total_distance']} m"
-    )
-
-    print("\nInstructions:\n")
-
-    for number, step in enumerate(
-        route["steps"],
-        start=1,
-    ):
-
-        print(
-            f"{number}. "
-            f"{step['from']} -> "
-            f"{step['to']} "
-            f"({step['distance']} m)"
-        )
-
-
-# ============================================================
-# SEND ROUTE TO CONTROL ARDUINO
-# ============================================================
-
-def send_route_to_control(
-    serial_manager,
-    route,
-):
-
+def send_route_to_control(serial_manager, route):
+    steps = route["steps"]
+    if not 1 <= len(steps) <= MAX_STEPS:
+        raise ValueError("Route does not fit the device's 20-step capacity")
+    for step in steps:
+        name = step["display_name"]
+        if not name or len(name) > 16 or any(c in name for c in "|\r\n"):
+            raise ValueError("Invalid LCD step label")
+        name.encode("ascii")
+        pixels = unpack_pixels(step["matrix_mask"])
+        if not pixels or not pixels <= BASE_PIXELS:
+            raise ValueError("Invalid route segment pixels")
     serial_manager.send_control("BEGIN")
-
-    serial_manager.send_control(
-        f"TOTAL|{route['total_distance']}"
-    )
-
-    for step in route["steps"]:
-
+    serial_manager.send_control(f"MAP|{BASE_MASK}")
+    serial_manager.send_control(f"TOTAL|{int(route['total_distance'])}")
+    for step in steps:
         serial_manager.send_control(
-            "STEP|"
-            f"{step['display_name']}|"
-            f"{step['distance']}"
+            f"STEP|{step['display_name']}|{int(step['distance'])}|{step['matrix_mask']}"
         )
-
     serial_manager.send_control("END")
 
 
-# ============================================================
-# SEND ROUTE TO MATRIX ARDUINO
-# ============================================================
+class NavigatorSession:
+    """The Arduino owns the buttons and progress; Python owns route calculation."""
 
-def send_route_to_matrix(
-    serial_manager,
-    route,
-):
+    def __init__(self, serial_manager):
+        self.serial = serial_manager
+        self.route = None
+        self.current_step = 0
 
-    serial_manager.send_matrix("CLEAR")
+    def show_step(self):
+        if self.route and self.current_step < len(self.route["steps"]):
+            step = self.route["steps"][self.current_step]
+            print(f"[STEP {self.current_step + 1}] Go to {step['to']}, approximately {step['distance']} m")
 
-    # The matrix Arduino doesn't need hidden routing nodes.
-    #
-    # Example:
-    #
-    # ROUTE|WMC|Library|AQ|TASC1
+    def handle(self, message):
+        if message == "READY":
+            # HELLO also returns READY; it is not a reset event.
+            print("[DEVICE] One-board navigator connected")
+        elif message.startswith("ROUTE|"):
+            self.route = None
+            self.current_step = 0
+            parts = message.split("|")
+            if len(parts) != 3:
+                self.serial.send_control("ERROR|BAD REQUEST")
+                return
+            start, destination = parts[1:]
+            try:
+                if start == destination:
+                    raise ValueError("Start and destination are the same")
+                route = calculate_route(start, destination)
+                if route is None:
+                    self.serial.send_control("ERROR|NO ROUTE")
+                    return
+                send_route_to_control(self.serial, route)
+                self.route = route
+                print("[PATH]", " -> ".join(route["full_path"]))
+                self.show_step()
+            except (ValueError, KeyError) as error:
+                print("[ROUTE ERROR]", error)
+                self.serial.send_control("ERROR|INVALID ROUTE")
+        elif message == "NEXT" and self.route:
+            self.current_step = min(self.current_step + 1, len(self.route["steps"]))
+            self.show_step()
+        elif message == "PREVIOUS" and self.route:
+            self.current_step = max(0, self.current_step - 1)
+            self.show_step()
+        elif message == "REPEAT":
+            self.show_step()  # Add laptop speech here if desired; no audio is included.
+        elif message == "ARRIVED":
+            if self.route:
+                self.current_step = len(self.route["steps"])
+                print("[ARRIVED]", self.route["visible_path"][-1])
+        elif message in ("RESET", "BOOT") or message.startswith("DEVICE_ERROR|"):
+            self.route = None
+            self.current_step = 0
+            print("[DEVICE]", message)
 
-    message = (
-        "ROUTE|"
-        + "|".join(
-            route["visible_path"]
-        )
-    )
 
-    serial_manager.send_matrix(message)
+def mock_mode(start=None, destination=None):
+    print("Available locations:", ", ".join(sorted(LANDMARKS)))
+    start = start or input("Start: ").strip()
+    destination = destination or input("Destination: ").strip()
+    route = calculate_route(start, destination)
+    if route is None:
+        print("No route found")
+        return
+    print("Internal path:", " -> ".join(route["full_path"]))
+    print("Landmarks:", " -> ".join(route["visible_path"]))
+    print(f"Prototype distance: {route['total_distance']} m")
+    for number, step in enumerate(route["steps"], 1):
+        print(f"{number}. Go to {step['to']} ({step['distance']} m)")
 
-    serial_manager.send_matrix(
-        "SEGMENT|0"
-    )
 
-
-# ============================================================
-# HARDWARE MODE
-# ============================================================
-
-def hardware_mode():
-
-    serial_manager = SerialManager()
-
+def hardware_mode(port):
+    manager = SerialManager(port)
     try:
-
-        serial_manager.connect()
-
-        print()
-        print("SFU Navigator ready.")
-        print("Waiting for Arduino input...")
-        print()
-
-        current_route = None
-        current_segment = 0
-
+        manager.connect()
+        session = NavigatorSession(manager)
+        print("Ready. Choose START and DESTINATION on the device.")
         while True:
-
-            message = (
-                serial_manager.read_control()
-            )
-
+            message = manager.read_control()
             if message is None:
-
-                time.sleep(0.01)
-                continue
-
-            # ------------------------------------------------
-            # ROUTE|WMC|TASC1
-            # ------------------------------------------------
-
-            if message.startswith("ROUTE|"):
-
-                parts = message.split("|")
-
-                if len(parts) != 3:
-
-                    serial_manager.send_control(
-                        "ERROR|BAD REQUEST"
-                    )
-
-                    continue
-
-                start = parts[1]
-                destination = parts[2]
-
-                print(
-                    f"\n[ROUTE] "
-                    f"{start} -> {destination}"
-                )
-
-                try:
-
-                    current_route = (
-                        calculate_route(
-                            start,
-                            destination,
-                        )
-                    )
-
-                except ValueError as error:
-
-                    print("[ERROR]", error)
-
-                    serial_manager.send_control(
-                        "ERROR|INVALID LOCATION"
-                    )
-
-                    continue
-
-                if current_route is None:
-
-                    serial_manager.send_control(
-                        "ERROR|NO ROUTE"
-                    )
-
-                    continue
-
-                print(
-                    "[PATH]",
-                    " -> ".join(
-                        current_route[
-                            "full_path"
-                        ]
-                    ),
-                )
-
-                print(
-                    "[DISTANCE]",
-                    current_route[
-                        "total_distance"
-                    ],
-                    "m",
-                )
-
-                send_route_to_control(
-                    serial_manager,
-                    current_route,
-                )
-
-                send_route_to_matrix(
-                    serial_manager,
-                    current_route,
-                )
-
-                current_segment = 0
-
-            # ------------------------------------------------
-            # NEXT
-            # ------------------------------------------------
-
-            elif message == "NEXT":
-
-                if current_route is None:
-                    continue
-
-                maximum_segment = max(
-                    0,
-                    len(
-                        current_route[
-                            "steps"
-                        ]
-                    ) - 1,
-                )
-
-                current_segment = min(
-                    current_segment + 1,
-                    maximum_segment,
-                )
-
-                serial_manager.send_matrix(
-                    f"SEGMENT|"
-                    f"{current_segment}"
-                )
-
-            # ------------------------------------------------
-            # PREVIOUS
-            # ------------------------------------------------
-
-            elif message == "PREVIOUS":
-
-                if current_route is None:
-                    continue
-
-                current_segment = max(
-                    current_segment - 1,
-                    0,
-                )
-
-                serial_manager.send_matrix(
-                    f"SEGMENT|"
-                    f"{current_segment}"
-                )
-
-            # ------------------------------------------------
-            # ARRIVED
-            # ------------------------------------------------
-
-            elif message == "ARRIVED":
-
-                serial_manager.send_matrix(
-                    "ARRIVED"
-                )
-
-            # ------------------------------------------------
-            # RESET
-            # ------------------------------------------------
-
-            elif message == "RESET":
-
-                current_route = None
-                current_segment = 0
-
-                serial_manager.send_matrix(
-                    "CLEAR"
-                )
-
+                time.sleep(0.005)
+            else:
+                session.handle(message)
     except KeyboardInterrupt:
-
-        print("\nStopping SFU Navigator.")
-
+        print("\nStopped.")
     finally:
+        manager.close()
 
-        serial_manager.close()
-
-
-# ============================================================
-# ENTRY POINT
-# ============================================================
 
 def main():
-
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--mock",
-        action="store_true",
-        help=(
-            "Run pathfinding without "
-            "connecting to Arduinos."
-        ),
-    )
-
+    parser = argparse.ArgumentParser(description="SFU navigator: one UNO R4 WiFi")
+    parser.add_argument("--mock", action="store_true", help="Pathfinding without hardware")
+    parser.add_argument("--port", default=CONTROL_PORT, help="Arduino USB port, e.g. COM3 or /dev/ttyACM0")
+    parser.add_argument("--start", help="Start location for --mock")
+    parser.add_argument("--destination", help="Destination for --mock")
     args = parser.parse_args()
-
-    if args.mock:
-        mock_mode()
-
-    else:
-        hardware_mode()
+    try:
+        if args.mock:
+            mock_mode(args.start, args.destination)
+        else:
+            hardware_mode(args.port)
+    except Exception as error:
+        parser.exit(1, f"Error: {error}\nClose Serial Monitor and check the USB port and dependencies.\n")
 
 
 if __name__ == "__main__":
