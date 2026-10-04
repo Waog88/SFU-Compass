@@ -2,128 +2,184 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SFU Compass</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SFU Navigator - Campus Kiosk</title>
   <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans flex flex-col">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
 
-  <!-- Header -->
-  <header class="bg-slate-950 border-b border-slate-800 p-4 sticky top-0 z-50 shadow-md">
+    /* Permanent high-contrast label badges over map nodes */
+    .landmark-label-badge {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid #475569;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 6px;
+      white-space: nowrap;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+      pointer-events: none;
+    }
+
+    .leaflet-tooltip-top.landmark-label-badge::before {
+      border-top-color: #475569;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col">
+
+  <header class="bg-slate-900 border-b border-slate-800 p-4 sticky top-0 z-50">
     <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center font-black text-xl text-white shadow-lg shadow-red-900/30">SFU</div>
+      <div class="flex items-center space-x-3">
+        <div class="bg-[#A6192E] p-2.5 rounded-xl text-white font-black tracking-wider text-xl shadow-lg">SFU</div>
         <div>
-          <h1 class="font-bold text-lg leading-tight">SFU Compass</h1>
-          <p class="text-xs text-slate-400">Campus Navigation & Route Finder</p>
+          <h1 class="text-xl font-bold tracking-tight text-white">SFU Navigator</h1>
+          <p class="text-xs text-slate-400">Burnaby Campus Interactive Kiosk</p>
         </div>
       </div>
-
-      <div class="flex items-center gap-3">
-        <button id="connect-btn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow">
-          <span id="serial-dot" class="w-2 h-2 rounded-full bg-slate-500"></span>
-          <span id="serial-btn-text">Connect Hardware</span>
-        </button>
-        <span id="serial-status" class="text-[10px] text-slate-400 bg-slate-950 px-2 py-1 rounded border border-slate-800">DISCONNECTED</span>
-      </div>
+      <button id="connect-btn" class="bg-red-600 hover:bg-red-500 text-white font-semibold text-xs px-4 py-2.5 rounded-lg transition-all flex items-center gap-2 shadow-md">
+        <span class="w-2 h-2 rounded-full bg-red-200 animate-ping"></span> Connect Arduino Serial
+      </button>
     </div>
   </header>
 
-  <!-- Main Content Layout -->
-  <main class="max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow">
+  <main class="flex-1 max-w-7xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 p-4 md:p-6">
     
-    <!-- Controls & Step Panel (Left) -->
-    <div class="lg:col-span-4 flex flex-col gap-5">
-      
-      <!-- Selector Card -->
-      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 shadow-xl">
-        <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-          Select Waypoints
+    <div class="lg:col-span-4 flex flex-col gap-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <h2 class="text-sm uppercase tracking-wider font-semibold text-slate-400 mb-4 flex items-center justify-between">
+          <span>Route Planner</span>
+          <span id="route-distance-badge" class="hidden text-xs bg-red-950 text-red-400 border border-red-800 px-2.5 py-0.5 rounded-full font-bold">0m</span>
         </h2>
-
+        
         <div class="space-y-4">
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">START LOCATION</label>
-            <select id="start-select" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none text-white"></select>
+            <label class="block text-xs font-medium text-slate-400 mb-1.5">Start Location</label>
+            <select id="start-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-red-500"></select>
           </div>
-
           <div>
-            <label class="block text-xs font-semibold text-slate-400 mb-1">DESTINATION</label>
-            <select id="dest-select" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-sm font-medium focus:ring-2 focus:ring-red-500 outline-none text-white"></select>
+            <label class="block text-xs font-medium text-slate-400 mb-1.5">Destination Landmark</label>
+            <select id="dest-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-red-500"></select>
           </div>
-
-          <button id="calc-btn" class="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-xl shadow-lg shadow-red-900/40 transition-all text-sm flex items-center justify-center gap-2">
-            Calculate Route
-          </button>
+          <button id="calc-btn" class="w-full bg-red-600 hover:bg-red-500 text-white font-semibold py-3 rounded-xl transition-all shadow-lg">Calculate Shortest Route</button>
         </div>
       </div>
 
-      <!-- Route Directions Steps -->
-      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 shadow-xl flex-grow flex flex-col">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex-1 flex flex-col">
+        <h2 class="text-sm uppercase tracking-wider font-semibold text-slate-400 mb-3 flex items-center justify-between">
+          <span>Step-by-Step Directions</span>
+          <span id="step-count-badge" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono">0 steps</span>
+        </h2>
+        <div id="steps-container" class="space-y-2.5 overflow-y-auto max-h-[300px] pr-1 flex-1">
+          <p class="text-sm text-slate-500 italic py-4 text-center">Select a start and destination to display instructions.</p>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
         <div class="flex items-center justify-between mb-3">
-          <h2 class="text-sm font-bold text-slate-300 uppercase tracking-wider">Directions</h2>
-          <span id="route-distance-badge" class="hidden text-xs bg-red-950 border border-red-800 text-red-400 font-bold px-2.5 py-0.5 rounded-full">0m</span>
+          <h2 class="text-xs uppercase tracking-wider font-semibold text-slate-400">Serial Data Monitor</h2>
+          <span id="serial-status" class="text-[10px] text-slate-500 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">DISCONNECTED</span>
         </div>
-
-        <div id="active-step-indicator" class="text-[10px] text-slate-500 mb-2 font-mono">STEP 0/0</div>
-
-        <div id="steps-container" class="space-y-2 overflow-y-auto max-h-[300px] pr-1">
-          <p class="text-xs text-slate-500 italic">Select start and destination to calculate a path.</p>
-        </div>
-
-        <div id="path-summary" class="mt-4 pt-3 border-t border-slate-800/80 text-[11px] font-mono text-slate-400 break-words"></div>
-      </div>
-
-      <!-- Serial Debug Terminal -->
-      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-4 shadow-xl">
-        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Hardware Console</h3>
-        <div id="serial-log" class="bg-slate-900 border border-slate-800 rounded-lg p-2.5 h-24 overflow-y-auto font-mono text-[10px] text-emerald-400 space-y-1">
-          <div>> Console ready...</div>
+        <div id="serial-log" class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 h-24 overflow-y-auto font-mono text-[11px] text-emerald-400 space-y-1">
+          <div class="text-slate-600">// Waiting for serial data packet...</div>
         </div>
       </div>
-
     </div>
 
-    <!-- Map Canvas Panel (Right) -->
-    <div class="lg:col-span-8 flex flex-col gap-2">
-      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3 shadow-xl flex flex-col h-full">
-        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
-          <div class="text-xs text-slate-400 flex items-center gap-2">
-            <span class="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-            <span>Interactive Campus Map</span>
+    <div class="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 md:p-6 shadow-xl flex flex-col justify-between">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white">SFU Burnaby Campus Map</h2>
+          <p class="text-xs text-slate-400">Synced to Official SFU Room Finder Layout</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <button id="reset-view-btn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg transition-all border border-slate-700">Reset View</button>
+          <div class="flex items-center gap-3 text-xs text-slate-400 hidden sm:flex">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-600 inline-block"></span> Landmark</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span> Active Route</span>
           </div>
-          <div class="text-[11px] text-slate-500">Scroll to Zoom • Drag to Pan</div>
         </div>
+      </div>
 
-        <div class="relative w-full h-[550px] lg:h-[680px] bg-slate-950 border border-slate-800 rounded-xl overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing">
-          <canvas id="map-canvas" class="w-full h-full object-contain"></canvas>
-        </div>
+      <div class="relative w-full bg-slate-950 border border-slate-800 rounded-xl overflow-hidden" style="height: 520px;">
+        <div id="map" class="w-full h-full z-10"></div>
+      </div>
+
+      <div class="mt-4 flex items-center justify-between text-xs text-slate-500 border-t border-slate-800/60 pt-3">
+        <span>SFU Burnaby Mountain Campus Grid</span>
+        <span id="path-summary">Ready for routing</span>
       </div>
     </div>
 
   </main>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // Landmark Config
     const LANDMARKS = [
       "WMC", "Library", "SUB", "MBC", "AQ", 
       "Shrum Chemistry", "Shrum Physics", "Shrum Biology", 
       "South Sciences", "ASB", "TASC1", "TASC2"
     ];
 
-    const SHORT_NAMES = {
-      "WMC": "WMC", "Library": "LIBRARY", "SUB": "SUB", "MBC": "MBC",
-      "AQ": "AQ", "Shrum Chemistry": "SHRUM CHEM", "Shrum Physics": "SHRUM PHYS",
-      "Shrum Biology": "SHRUM BIO", "South Sciences": "SOUTH SCI", "ASB": "ASB",
-      "TASC1": "TASC 1", "TASC2": "TASC 2"
+    const NODE_DESCRIPTIONS = {
+      "WMC": "West Mall Centre Main Entrance",
+      "WMC_EAST": "WMC East / Technology Complex (TC)",
+      "LIBRARY_WEST": "Library Concourse West",
+      "Library": "SFU W.A.C. Bennett Library (LIB)",
+      "SUB": "Student Union Building (SUB)",
+      "CONVOCATION_WEST": "Convocation Mall Concourse",
+      "CONVOCATION_CENTRE": "Convocation Mall Central Plaza",
+      "MBC": "Maggie Benston Centre (MBC)",
+      "AQ_WEST": "Academic Quadrangle West Wing",
+      "AQ": "Academic Quadrangle Courtyard (AQ)",
+      "AQ_SOUTH": "Academic Quadrangle South Wing",
+      "SHRUM_NORTH": "Shrum Science North Complex",
+      "Shrum Chemistry": "Shrum Chemistry Building",
+      "Shrum Physics": "Shrum Physics Building",
+      "Shrum Biology": "Shrum Biology Building",
+      "SHRUM_SOUTH": "Shrum Science South Entrance",
+      "South Sciences": "South Sciences Building",
+      "ASB_WEST": "Applied Sciences Building West",
+      "ASB": "Applied Sciences Building (ASB)",
+      "TASC_JUNCTION": "TASC Science Complex Access",
+      "TASC1": "TASC 1 Research Facility",
+      "TASC2": "TASC 2 Research Facility"
     };
 
-    // Graph Distances
+    const NODE_COORDS = {
+      "WMC": [49.27974338826343, -122.92173813941224],
+      "WMC_EAST": [49.27958590754218, -122.92109440923382],
+      "LIBRARY_WEST": [49.27944242466946, -122.91997861025789],
+      "Library": [49.279610404581824, -122.91879307386924],
+      "SUB": [49.27884749122877, -122.91872333646934],
+      "CONVOCATION_WEST": [49.27935493491158, -122.91938852430256],
+      "CONVOCATION_CENTRE": [49.27932603357816, -122.91912912729664],
+      "MBC": [49.27889998564473, -122.91932951572181],
+      "AQ_WEST": [49.27900847392599, -122.91710864663696],
+      "AQ": [49.278959479247625, -122.9164005434407],
+      "AQ_SOUTH": [49.278656073512664, -122.91723187252434],
+      "SHRUM_NORTH": [49.278382038285024, -122.9174680626358],
+      "Shrum Chemistry": [49.27802507140837, -122.91762899518041],
+      "Shrum Physics": [49.27757010987956, -122.91605722066143],
+      "Shrum Biology": [49.277762594113405, -122.91693162084431],
+      "SHRUM_SOUTH": [49.277749671239015, -122.91606805522325],
+      "South Sciences": [49.27722713610447, -122.91809033516547],
+      "ASB_WEST": [49.27741262221323, -122.91463564990394],
+      "ASB": [49.27740562274994, -122.91423868296062],
+      "TASC_JUNCTION": [49.276884434037655, -122.91519278883526],
+      "TASC1": [49.276796113135454, -122.9144437002112],
+      "TASC2": [49.27704341126308, -122.91642923632313]
+    };
+
     const GRAPH = {
       "WMC": { "WMC_EAST": 25 },
       "WMC_EAST": { "WMC": 25, "LIBRARY_WEST": 120 },
-      "LIBRARY_WEST": { "WMC_EAST": 120, "Library": 25, "CONVOCATION_WEST": 55 },
+      "LIBRARY_WEST": { "WMC_EAST": 120, "Library": 25, "CONVOCATION_WEST": 40 },
       "Library": { "LIBRARY_WEST": 25, "SUB": 70 },
       "SUB": { "Library": 70, "CONVOCATION_WEST": 55 },
       "CONVOCATION_WEST": { "LIBRARY_WEST": 55, "SUB": 55, "CONVOCATION_CENTRE": 60 },
@@ -145,52 +201,61 @@
       "TASC2": { "TASC_JUNCTION": 55, "TASC1": 50 }
     };
 
-    // Coordinates for 1600x1100 Canvas
-      // Coordinates aligned for a 1600x1100 canvas
-const NODE_POSITIONS = {
-  "WMC": { x: 580, y: 390 },
-  "WMC_EAST": { x: 620, y: 400 },
-  "LIBRARY_WEST": { x: 670, y: 430 },
-  "Library": { x: 710, y: 480 },
-  "SUB": { x: 740, y: 530 },
-  "CONVOCATION_WEST": { x: 690, y: 410 },
-  "CONVOCATION_CENTRE": { x: 730, y: 410 },
-  "MBC": { x: 720, y: 560 },
-  "AQ_WEST": { x: 780, y: 440 },
-  "AQ": { x: 850, y: 440 },
-  "AQ_SOUTH": { x: 820, y: 530 },
-  "SHRUM_NORTH": { x: 830, y: 590 },
-  "Shrum Chemistry": { x: 790, y: 600 },
-  "Shrum Physics": { x: 850, y: 630 },
-  "Shrum Biology": { x: 910, y: 630 },
-  "SHRUM_SOUTH": { x: 860, y: 680 },
-  "South Sciences": { x: 820, y: 720 },
-  "ASB_WEST": { x: 930, y: 700 },
-  "ASB": { x: 970, y: 680 },
-  "TASC_JUNCTION": { x: 1020, y: 670 },
-  "TASC1": { x: 1040, y: 620 },
-  "TASC2": { x: 1090, y: 620 }
-};
+    const map = L.map('map', { zoomControl: false }).setView([49.2782, -122.9160], 16);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Map Image Setup
-    const mapImage = new Image();
-    mapImage.crossOrigin = "anonymous";
-    mapImage.src = "./sfu_map.jpg";
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 18,
+      attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ'
+    }).addTo(map);
 
-    const canvas = document.getElementById("map-canvas");
-    const ctx = canvas.getContext("2d");
+    const routeLayerGroup = L.layerGroup().addTo(map);
+    const markersLayerGroup = L.layerGroup().addTo(map);
 
-    // Zoom & Pan Setup
-    let scale = 1.3;
-    let panX = -250;
-    let panY = -150;
-    let isDragging = false;
-    let startX, startY;
+    function initSelects() {
+      LANDMARKS.forEach(landmark => {
+        const opt1 = document.createElement("option");
+        opt1.value = landmark;
+        opt1.textContent = landmark;
+        document.getElementById("start-select").appendChild(opt1);
 
-    mapImage.onload = () => drawMap();
-    mapImage.onerror = () => {
-      mapImage.src = "https://raw.githubusercontent.com/Waog88/SFU-Compass/main/sfu_map.jpg";
-    };
+        const opt2 = document.createElement("option");
+        opt2.value = landmark;
+        opt2.textContent = landmark;
+        document.getElementById("dest-select").appendChild(opt2);
+      });
+      document.getElementById("start-select").value = "WMC";
+      document.getElementById("dest-select").value = "TASC1";
+    }
+
+    function renderMapMarkers() {
+      markersLayerGroup.clearLayers();
+      for (const node in NODE_COORDS) {
+        const isLandmark = LANDMARKS.includes(node);
+        const coords = NODE_COORDS[node];
+        
+        const circleMarker = L.circleMarker(coords, {
+          radius: isLandmark ? 8 : 4,
+          color: '#ffffff',
+          weight: 1.5,
+          fillColor: isLandmark ? '#dc2626' : '#475569',
+          fillOpacity: 0.95
+        });
+
+        // Always show the building name tag on the map for landmarks
+        if (isLandmark) {
+          circleMarker.bindTooltip(node, {
+            permanent: true,
+            direction: 'top',
+            offset: [0, -8],
+            className: 'landmark-label-badge'
+          });
+        }
+
+        circleMarker.bindPopup(`<b>${NODE_DESCRIPTIONS[node] || node}</b>`);
+        markersLayerGroup.addLayer(circleMarker);
+      }
+    }
 
     function dijkstra(start, destination) {
       const distances = {};
@@ -208,14 +273,12 @@ const NODE_POSITIONS = {
       while (unvisited.size > 0) {
         let current = null;
         let lowestDist = Infinity;
-
         unvisited.forEach(node => {
           if (distances[node] < lowestDist) {
             lowestDist = distances[node];
             current = node;
           }
         });
-
         if (current === null || current === destination) break;
         unvisited.delete(current);
 
@@ -231,291 +294,86 @@ const NODE_POSITIONS = {
       }
 
       if (distances[destination] === Infinity) return { path: [], distance: Infinity };
-
       const path = [];
       let curr = destination;
       while (curr !== null) {
         path.unshift(curr);
         curr = previous[curr];
       }
-
       return { path, distance: distances[destination] };
     }
 
-    function buildSteps(fullPath) {
-      if (!fullPath || fullPath.length === 0) return [];
-      const steps = [];
-      let currentLandmark = null;
-      let distanceSinceLandmark = 0;
-
-      fullPath.forEach((node, index) => {
-        if (index === 0) {
-          if (LANDMARKS.includes(node)) currentLandmark = node;
-          return;
-        }
-
-        const prevNode = fullPath[index - 1];
-        distanceSinceLandmark += GRAPH[prevNode][node];
-
-        if (LANDMARKS.includes(node)) {
-          if (currentLandmark !== null) {
-            steps.push({
-              from: currentLandmark,
-              to: node,
-              displayName: SHORT_NAMES[node] || node,
-              distance: distanceSinceLandmark
-            });
-          }
-          currentLandmark = node;
-          distanceSinceLandmark = 0;
-        }
-      });
-
-      return steps;
-    }
-
-    const startSelect = document.getElementById("start-select");
-    const destSelect = document.getElementById("dest-select");
-    const stepsContainer = document.getElementById("steps-container");
-    const distBadge = document.getElementById("route-distance-badge");
-    const pathSummary = document.getElementById("path-summary");
-    const serialLog = document.getElementById("serial-log");
-    const activeStepIndicator = document.getElementById("active-step-indicator");
-
-    let currentRoutePath = [];
-    let currentSteps = [];
-    let activeStepSegment = 0;
-
-    let port = null;
-    let writer = null;
-
-    function initSelects() {
-      LANDMARKS.forEach(landmark => {
-        const opt1 = document.createElement("option");
-        opt1.value = landmark;
-        opt1.textContent = landmark;
-        startSelect.appendChild(opt1);
-
-        const opt2 = document.createElement("option");
-        opt2.value = landmark;
-        opt2.textContent = landmark;
-        destSelect.appendChild(opt2);
-      });
-
-      startSelect.value = "WMC";
-      destSelect.value = "TASC1";
-    }
-
-    function setupCanvasSize() {
-      canvas.width = 1600;
-      canvas.height = 1100;
-      drawMap();
-    }
-
-    function drawMap() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.save();
-      ctx.translate(panX, panY);
-      ctx.scale(scale, scale);
-
-      if (mapImage.complete && mapImage.naturalWidth !== 0) {
-        ctx.drawImage(mapImage, 0, 0, canvas.width, canvas.height);
-      } else {
-        ctx.fillStyle = "#020617";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-
-      // Base network
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(71, 85, 105, 0.5)";
-      for (const node in GRAPH) {
-        const startPos = NODE_POSITIONS[node];
-        for (const neighbor in GRAPH[node]) {
-          const endPos = NODE_POSITIONS[neighbor];
-          if (startPos && endPos) {
-            ctx.beginPath();
-            ctx.moveTo(startPos.x, startPos.y);
-            ctx.lineTo(endPos.x, endPos.y);
-            ctx.stroke();
-          }
-        }
-      }
-
-      // Highlighted Route
-      if (currentRoutePath.length > 1) {
-        ctx.shadowColor = "#ef4444";
-        ctx.shadowBlur = 15;
-        ctx.lineWidth = 8;
-        ctx.strokeStyle = "#dc2626";
-        
-        ctx.beginPath();
-        for (let i = 0; i < currentRoutePath.length - 1; i++) {
-          const u = NODE_POSITIONS[currentRoutePath[i]];
-          const v = NODE_POSITIONS[currentRoutePath[i + 1]];
-          if (u && v) {
-            ctx.moveTo(u.x, u.y);
-            ctx.lineTo(v.x, v.y);
-          }
-        }
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-      }
-
-      // Landmark Nodes & Text Labels
-      for (const node in NODE_POSITIONS) {
-        const pos = NODE_POSITIONS[node];
-        const isLandmark = LANDMARKS.includes(node);
-        const isSelected = currentRoutePath.includes(node);
-
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, isLandmark ? 11 : 5, 0, Math.PI * 2);
-
-        if (isSelected) {
-          ctx.fillStyle = "#ef4444";
-          ctx.strokeStyle = "#ffffff";
-          ctx.lineWidth = 3;
-        } else if (isLandmark) {
-          ctx.fillStyle = "#991b1b";
-          ctx.strokeStyle = "#fca5a5";
-          ctx.lineWidth = 2;
-        } else {
-          ctx.fillStyle = "#f59e0b";
-          ctx.strokeStyle = "#78350f";
-          ctx.lineWidth = 1.5;
-        }
-        
-        ctx.fill();
-        ctx.stroke();
-
-        if (isLandmark) {
-          const labelText = node;
-          ctx.font = isSelected ? "bold 15px sans-serif" : "bold 13px sans-serif";
-          const textWidth = ctx.measureText(labelText).width;
-
-          ctx.fillStyle = isSelected ? "rgba(185, 28, 28, 0.9)" : "rgba(15, 23, 42, 0.85)";
-          ctx.fillRect(pos.x + 14, pos.y - 12, textWidth + 10, 20);
-          ctx.strokeStyle = isSelected ? "#fca5a5" : "#475569";
-          ctx.lineWidth = 1;
-          ctx.strokeRect(pos.x + 14, pos.y - 12, textWidth + 10, 20);
-
-          ctx.fillStyle = "#ffffff";
-          ctx.fillText(labelText, pos.x + 19, pos.y + 2);
-        }
-      }
-
-      ctx.restore();
-    }
-
-    // Pan / Zoom Controls
-    canvas.addEventListener("mousedown", (e) => {
-      isDragging = true;
-      startX = e.clientX - panX;
-      startY = e.clientY - panY;
-    });
-
-    canvas.addEventListener("mousemove", (e) => {
-      if (!isDragging) return;
-      panX = e.clientX - startX;
-      panY = e.clientY - startY;
-      drawMap();
-    });
-
-    canvas.addEventListener("mouseup", () => isDragging = false);
-    canvas.addEventListener("mouseleave", () => isDragging = false);
-
-    canvas.addEventListener("wheel", (e) => {
-      e.preventDefault();
-      if (e.deltaY < 0) {
-        scale = Math.min(scale * 1.1, 3.5);
-      } else {
-        scale = Math.max(scale / 1.1, 0.6);
-      }
-      drawMap();
-    }, { passive: false });
+    let lastPolyline = null;
 
     function calculateAndDisplay() {
-      const start = startSelect.value;
-      const dest = destSelect.value;
+      const start = document.getElementById("start-select").value;
+      const dest = document.getElementById("dest-select").value;
 
       if (start === dest) {
-        stepsContainer.innerHTML = `<p class="text-xs text-amber-400 py-2">Start location and destination are identical.</p>`;
-        currentRoutePath = [];
-        drawMap();
+        document.getElementById("steps-container").innerHTML = `<p class="text-xs text-amber-400 py-2">Start location and destination are identical.</p>`;
+        document.getElementById("step-count-badge").textContent = "0 steps";
+        routeLayerGroup.clearLayers();
         return;
       }
 
       const { path, distance } = dijkstra(start, dest);
-      currentRoutePath = path;
-      currentSteps = buildSteps(path);
-      activeStepSegment = 0;
+      document.getElementById("route-distance-badge").textContent = `${distance}m`;
+      document.getElementById("route-distance-badge").classList.remove("hidden");
 
-      distBadge.textContent = `${distance}m`;
-      distBadge.classList.remove("hidden");
+      const steps = [];
+      for (let i = 0; i < path.length - 1; i++) {
+        steps.push({
+          fromName: NODE_DESCRIPTIONS[path[i]] || path[i],
+          toName: NODE_DESCRIPTIONS[path[i+1]] || path[i+1],
+          distance: GRAPH[path[i]][path[i+1]]
+        });
+      }
 
-      renderStepList();
+      document.getElementById("step-count-badge").textContent = `${steps.length} steps`;
+      const container = document.getElementById("steps-container");
+      container.innerHTML = "";
 
-      pathSummary.textContent = `Route: ${path.join(" → ")}`;
-      logSerial(`Route computed: ${start} -> ${dest} (${distance}m)`);
-      drawMap();
-    }
-
-    function renderStepList() {
-      stepsContainer.innerHTML = "";
-      activeStepIndicator.textContent = `STEP ${activeStepSegment + 1}/${currentSteps.length}`;
-
-      currentSteps.forEach((step, idx) => {
-        const isActive = idx === activeStepSegment;
+      steps.forEach((step, idx) => {
         const item = document.createElement("div");
-        item.className = `p-3 rounded-xl flex items-center justify-between border transition-all ${
-          isActive 
-            ? "bg-red-950/70 border-red-500 shadow-md scale-[1.01]" 
-            : "bg-slate-900 border-slate-800 opacity-80"
-        }`;
+        item.className = "bg-slate-950 border border-slate-800 p-3 rounded-xl flex items-center justify-between gap-3";
         item.innerHTML = `
-          <div class="flex items-center gap-3">
-            <span class="w-6 h-6 rounded-full ${isActive ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-400'} font-bold text-xs flex items-center justify-center border border-slate-700">${idx + 1}</span>
-            <div>
-              <div class="text-xs font-bold ${isActive ? 'text-white' : 'text-slate-300'}">${step.from} → ${step.to}</div>
-              <div class="text-[10px] text-slate-500">Short Name: ${step.displayName}</div>
+          <div class="flex items-center gap-3 min-w-0">
+            <span class="w-6 h-6 rounded-full bg-red-950 text-red-400 font-bold text-xs flex items-center justify-center border border-red-800 flex-shrink-0">${idx + 1}</span>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-slate-200 truncate">Proceed to: ${step.toName}</div>
+              <div class="text-[10px] text-slate-400 truncate">From: ${step.fromName}</div>
             </div>
           </div>
-          <span class="text-xs font-mono font-bold ${isActive ? 'text-red-400' : 'text-slate-400'}">${step.distance}m</span>
+          <span class="text-xs font-mono font-bold text-red-400 flex-shrink-0">${step.distance}m</span>
         `;
-        stepsContainer.appendChild(item);
+        container.appendChild(item);
       });
+
+      document.getElementById("path-summary").textContent = `Route: ${path.join(" → ")}`;
+      
+      routeLayerGroup.clearLayers();
+      const latLngs = path.map(node => NODE_COORDS[node]);
+      lastPolyline = L.polyline(latLngs, { color: '#ef4444', weight: 5, opacity: 0.85 });
+      routeLayerGroup.addLayer(lastPolyline);
+      map.invalidateSize();
+      map.fitBounds(lastPolyline.getBounds(), { padding: [50, 50] });
     }
 
-    function logSerial(msg) {
-      const entry = document.createElement("div");
-      entry.textContent = `> ${msg}`;
-      serialLog.appendChild(entry);
-      serialLog.scrollTop = serialLog.scrollHeight;
-    }
-
-    document.getElementById("connect-btn").addEventListener("click", async () => {
-      if ("serial" in navigator) {
-        try {
-          port = await navigator.serial.requestPort();
-          await port.open({ baudRate: 115200 });
-          document.getElementById("serial-status").textContent = "CONNECTED";
-          document.getElementById("serial-status").className = "text-[10px] text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800";
-          document.getElementById("serial-btn-text").textContent = "Serial Connected";
-          document.getElementById("serial-dot").className = "w-2 h-2 rounded-full bg-emerald-400 animate-pulse";
-          logSerial("Connected to Serial!");
-        } catch (err) {
-          logSerial("Connection error: " + err.message);
-        }
+    document.getElementById("calc-btn").addEventListener("click", calculateAndDisplay);
+    document.getElementById("reset-view-btn").addEventListener("click", () => {
+      if (lastPolyline) {
+        map.fitBounds(lastPolyline.getBounds(), { padding: [50, 50] });
       } else {
-        alert("Web Serial API is supported on Chrome and Edge.");
+        map.setView([49.2782, -122.9160], 16);
       }
     });
 
-    document.getElementById("calc-btn").addEventListener("click", () => calculateAndDisplay());
-
     initSelects();
-    setupCanvasSize();
-    calculateAndDisplay();
+    renderMapMarkers();
+    setTimeout(() => {
+      map.invalidateSize();
+      calculateAndDisplay();
+    }, 200);
   </script>
 </body>
 </html>
