@@ -12,24 +12,25 @@
     ::-webkit-scrollbar-track { background: #090d16; }
     ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
 
-    /* Permanent high-contrast label badges over map nodes */
+    /* High-contrast landmark badge with directional offsets */
     .landmark-label-badge {
       background: rgba(15, 23, 42, 0.95);
       border: 1px solid #475569;
       color: #ffffff;
       font-weight: 700;
-      font-size: 11px;
+      font-size: 10px;
       padding: 2px 6px;
-      border-radius: 6px;
+      border-radius: 5px;
       white-space: nowrap;
       box-shadow: 0 2px 6px rgba(0,0,0,0.6);
       pointer-events: none;
-      margin-bottom: 8px; /* Added spacing to lift label above node dot */
     }
 
-    .leaflet-tooltip-top.landmark-label-badge::before {
-      border-top-color: #475569;
-    }
+    /* Style tooltips arrows based on direction */
+    .leaflet-tooltip-top.landmark-label-badge::before { border-top-color: #475569; }
+    .leaflet-tooltip-bottom.landmark-label-badge::before { border-bottom-color: #475569; }
+    .leaflet-tooltip-left.landmark-label-badge::before { border-left-color: #475569; }
+    .leaflet-tooltip-right.landmark-label-badge::before { border-right-color: #475569; }
 
     /* Hide Leaflet attribution container */
     .leaflet-control-attribution {
@@ -112,9 +113,9 @@
           <div class="flex items-center gap-3">
             <button id="reset-view-btn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg transition-all border border-slate-700">Reset View</button>
             <div class="flex items-center gap-3 text-xs text-slate-400 hidden sm:flex">
-              <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-600 inline-block"></span> Landmark</span>
-              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span> Active Route</span>
-            </div>
+  <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-600 inline-block"></span> Landmark</span>
+  <span class="flex items-center gap-1.5"><span class="w-4 h-1 bg-red-500 rounded inline-block"></span> Active Route</span>
+</div>
           </div>
         </div>
 
@@ -165,7 +166,7 @@
             <div>
               <div class="w-12 h-12 rounded-xl bg-red-950 border border-red-800 text-red-400 font-bold text-lg flex items-center justify-center mb-3">ML</div>
               <h4 class="font-bold text-white text-base">Marcus Lang</h4>
-              <p class="text-xs text-slate-400 mt-2">Project Developer & Hardware Contributor</p>
+              <p class="text-xs text-slate-400 mt-2">Project Developer & Web Design Contributor</p>
             </div>
             <div class="pt-3 border-t border-slate-800/80 flex flex-col gap-1 text-xs text-slate-400 font-mono">
               <span class="text-slate-500 text-[10px]">CONTACT</span>
@@ -178,7 +179,7 @@
             <div>
               <div class="w-12 h-12 rounded-xl bg-red-950 border border-red-800 text-red-400 font-bold text-lg flex items-center justify-center mb-3">MY</div>
               <h4 class="font-bold text-white text-base">Marlon Yu</h4>
-              <p class="text-xs text-slate-400 mt-2">Project Developer & Hardware Contributor</p>
+              <p class="text-xs text-slate-400 mt-2">Project Developer & Web Design Contributor</p>
             </div>
             <div class="pt-3 border-t border-slate-800/80 flex flex-col gap-1 text-xs text-slate-400 font-mono">
               <span class="text-slate-500 text-[10px]">CONTACT</span>
@@ -191,7 +192,7 @@
             <div>
               <div class="w-12 h-12 rounded-xl bg-red-950 border border-red-800 text-red-400 font-bold text-lg flex items-center justify-center mb-3">AM</div>
               <h4 class="font-bold text-white text-base">Amirmhadi Mazaheri</h4>
-              <p class="text-xs text-slate-400 mt-2">Project Developer & Software Contributor</p>
+              <p class="text-xs text-slate-400 mt-2">Project Developer & Hardware Contributor</p>
             </div>
             <div class="pt-3 border-t border-slate-800/80 flex flex-col gap-1 text-xs text-slate-400 font-mono">
               <span class="text-slate-500 text-[10px]">CONTACT</span>
@@ -262,7 +263,7 @@
             <p class="text-xs text-slate-400 mb-4">Wiring layout connecting Arduino Uno R4 WiFi, LCD display, and joystick.</p>
           </div>
           <div class="bg-slate-950 border border-slate-800 rounded-xl h-64 flex flex-col items-center justify-center text-slate-500 overflow-hidden relative group">
-            <img src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80" alt="Circuit Diagram" class="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity" />
+            <img src="Circuit_Design" alt="Circuit Diagram" class="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity" />
             <span class="absolute bottom-3 left-3 bg-slate-900/90 text-slate-200 text-[11px] px-2.5 py-1 rounded border border-slate-700">Circuit Wiring Diagram</span>
           </div>
         </div>
@@ -330,6 +331,22 @@
       "Shrum Chemistry", "Shrum Physics", "Shrum Biology", 
       "South Sciences", "ASB", "TASC1", "TASC2"
     ];
+
+    // Directional placement configuration to eliminate overlapping
+    const LABEL_CONFIG = {
+      "WMC": { direction: "top", offset: [0, -10] },
+      "MBC": { direction: "left", offset: [-10, 0] },
+      "SUB": { direction: "right", offset: [10, 0] },
+      "Library": { direction: "top", offset: [0, -10] },
+      "AQ": { direction: "top", offset: [0, -10] },
+      "Shrum Chemistry": { direction: "top", offset: [0, -10] },
+      "Shrum Biology": { direction: "left", offset: [-10, 0] },
+      "Shrum Physics": { direction: "right", offset: [10, 0] },
+      "South Sciences": { direction: "left", offset: [-10, 0] },
+      "TASC2": { direction: "bottom", offset: [0, 10] },
+      "ASB": { direction: "top", offset: [0, -10] },
+      "TASC1": { direction: "bottom", offset: [0, 10] }
+    };
 
     const NODE_DESCRIPTIONS = {
       "WMC": "West Mall Centre Main Entrance",
@@ -451,7 +468,7 @@
         const coords = NODE_COORDS[node];
         
         const circleMarker = L.circleMarker(coords, {
-          radius: isLandmark ? 8 : 4,
+          radius: isLandmark ? 7 : 3.5,
           color: '#ffffff',
           weight: 1.5,
           fillColor: isLandmark ? '#dc2626' : '#475569',
@@ -459,10 +476,11 @@
         });
 
         if (isLandmark) {
+          const cfg = LABEL_CONFIG[node] || { direction: 'top', offset: [0, -10] };
           circleMarker.bindTooltip(node, {
             permanent: true,
-            direction: 'top',
-            offset: [0, -12], // Adjusted offset so badge rests floating right above circle marker
+            direction: cfg.direction,
+            offset: cfg.offset,
             className: 'landmark-label-badge'
           });
         }
